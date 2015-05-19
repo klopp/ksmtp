@@ -34,7 +34,7 @@ typedef struct _TextPart
 {
     char * body;
     char * ctype;
-//    CharSetType cs;
+    char * charset;
 }*TextPart;
 
 typedef struct _Smtp
@@ -49,7 +49,7 @@ typedef struct _Smtp
     string error;
     char boundary[32];
 #ifndef __WINDOWS__
-    char nodename[ HOST_NAME_MAX + 1 ];
+    char nodename[HOST_NAME_MAX + 1];
 #else
     char nodename[ PATH_MAX + 1 ];
 #endif
@@ -82,30 +82,31 @@ int smtpSetReplyTo( Smtp smtp, const char * rto );
 int smtpAddTo( Smtp smtp, const char * to );
 int smtpAddCc( Smtp smtp, const char * cc );
 int smtpAddBcc( Smtp smtp, const char * bcc );
-Smtp smtpAddFile( Smtp smtp, const char * file, const char * ctype );
+int smtpAddFile( Smtp smtp, const char * file, const char * ctype );
 
-Smtp smtpClearTo( Smtp smtp );
-Smtp smtpClearCc( Smtp smtp );
-Smtp smtpClearBcc( Smtp smtp );
-Smtp smtpClearFiles( Smtp smtp );
+void smtpClearTo( Smtp smtp );
+void smtpClearCc( Smtp smtp );
+void smtpClearBcc( Smtp smtp );
+void smtpClearFiles( Smtp smtp );
 
-Smtp smtpSetNodename( Smtp smtp, const char * node );
+void smtpSetNodename( Smtp smtp, const char * node );
 int smtpSetTimeout( Smtp smtp, int timeout );
 int smtpSetAuth( Smtp smtp, AuthType auth );
 
 int smtpSetSMTP( Smtp smtp, const char * host, int port );
-Smtp smtpSetHost( Smtp smtp, const char * host );
+int smtpSetHost( Smtp smtp, const char * host );
 int smtpSetPort( Smtp smtp, int port );
-Smtp smtpSetLogin( Smtp smtp, const char * login );
-Smtp smtpSetPassword( Smtp smtp, const char * password );
+int smtpSetLogin( Smtp smtp, const char * login );
+int smtpSetPassword( Smtp smtp, const char * password );
 
-Smtp smtpSetXmailer( Smtp smtp, const char * xmailer );
-Smtp smtpAddHeader( Smtp smtp, const char * hdr );
+int smtpSetXmailer( Smtp smtp, const char * xmailer );
+int smtpAddHeader( Smtp smtp, const char * hdr );
 //Smtp smtpAddHeaderPair( Smtp smtp, const char * key, const char * val );
-Smtp smtpClearHeaders( Smtp smtp );
+void smtpClearHeaders( Smtp smtp );
 
-Smtp smtpSetSubject( Smtp smtp, const char * subj );
-int smtpAddTextPart( Smtp smtp, const char * body, const char * ctype );
+int smtpSetSubject( Smtp smtp, const char * subj );
+int smtpAddTextPart( Smtp smtp, const char * body, const char * ctype, const char * charset );
+int smtpAddUtfTextPart( Smtp smtp, const char * body, const char * ctype );
 
 int smtpOpenSession( Smtp smtp );
 void smtpCloseSession( Smtp smtp );

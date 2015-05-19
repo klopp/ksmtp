@@ -11,7 +11,6 @@ int main( void )
 {
     Smtp smtp = smtpCreate();
 
-/*
 #define USER        "vsevolod.lutovinov@ibic.se"
 #define PASSWORD    "0UnrsZvNYGby"
 #define HOST        "mail.ibic.se"
@@ -28,13 +27,12 @@ int main( void )
 
     smtpAddTo( smtp, TO );
     smtpSetSubject( smtp, "Проба" );
-    smtpAddTextPart( smtp, html, "html" );
+    smtpAddUtfTextPart( smtp, "ляляля", "plain" );
 
-    smtpAddHeaderPair( smtp, "X-Custom-One", "One" );
+//    smtpAddHeaderPair( smtp, "X-Custom-One", "One" );
     smtpAddHeader( smtp, "X-Custom-Two: Two" );
 
     smtpAddFile( smtp, "/home/klopp/tmp/проба.png", NULL );
-*/
 
     return smtpDestroy( smtp, 0 );
 }

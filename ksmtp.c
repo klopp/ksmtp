@@ -12,6 +12,7 @@
 static void delTextPart( void * ptr )
 {
     TextPart part = (TextPart)ptr;
+    free( part->charset );
     free( part->body );
     free( part->ctype );
     free( part );
@@ -91,7 +92,8 @@ int smtpDestroy( Smtp smtp, int sig )
     return sig;
 }
 
-int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype )
+int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype,
+        const char * charset )
 {
     TextPart part = malloc( sizeof(struct _TextPart) );
     if( !part ) return 0;
@@ -104,12 +106,27 @@ int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype )
     part->ctype = strdup( ctype );
     if( !part->ctype )
     {
-        free( part->body );
-        free( part );
+        delTextPart( part );
         return 0;
     }
-    //part->cs = getCharSet( (u_char *)body );
-    return ladd( smtp->parts, part ) != NULL;
+    part->charset = strdup( charset );
+    if( !part->charset )
+    {
+        delTextPart( part );
+        return 0;
+    }
+    if( !ladd( smtp->parts, part ) )
+    {
+        delTextPart( part );
+        return 0;
+    }
+    return 1;
+}
+
+int smtpAddUtfTextPart( Smtp smtp, const char * body, const char *ctype )
+{
+    static char utf8[] = "UTF-8";
+    return smtpAddTextPart( smtp, body, ctype, utf8 );
 }
 
 const char *
@@ -182,39 +199,68 @@ int smtpSetFrom( Smtp smtp, const char * from )
 int smtpAddCc( Smtp smtp, const char * cc )
 {
     Addr addr = createAddr( cc );
-    return ladd( smtp->cc, addr );
+    if( addr )
+    {
+        if( !ladd( smtp->cc, addr ) )
+        {
+            delAddr( addr );
+            return 0;
+        }
+    }
+    return 1;
 }
-Smtp smtpClearCc( Smtp smtp )
+void smtpClearCc( Smtp smtp )
 {
     lclear( smtp->cc );
-    return smtp;
 }
-Smtp smtpClearTo( Smtp smtp )
+void smtpClearTo( Smtp smtp )
 {
     lclear( smtp->to );
-    return smtp;
 }
 int smtpAddBcc( Smtp smtp, const char * bcc )
 {
     Addr addr = createAddr( bcc );
-    return ladd( smtp->bcc, addr );
+    if( addr )
+    {
+        if( !ladd( smtp->bcc, addr ) )
+        {
+            delAddr( addr );
+            return 0;
+        }
+    }
+    return 1;
 }
-Smtp smtpClearBcc( Smtp smtp )
+void smtpClearBcc( Smtp smtp )
 {
     lclear( smtp->bcc );
-    return smtp;
 }
 
 int smtpAddTo( Smtp smtp, const char * to )
 {
     Addr addr = createAddr( to );
-    return ladd( smtp->to, addr );
+    if( addr )
+    {
+        if( !ladd( smtp->to, addr ) )
+        {
+            free( addr );
+            return 0;
+        }
+    }
+    return 1;
 }
 
-Smtp smtpAddHeader( Smtp smtp, const char * hdr )
+int smtpAddHeader( Smtp smtp, const char * hdr )
 {
-    ladd( smtp->headers, strdup( hdr ) );
-    return smtp;
+    char * h = strdup( hdr );
+    if( h )
+    {
+        if( !ladd( smtp->headers, h ) )
+        {
+            free( h );
+            return 0;
+        }
+    }
+    return 1;
 }
 /*
  Smtp smtpAddHeaderPair( Smtp smtp, const char * key, const char * value )
@@ -226,13 +272,12 @@ Smtp smtpAddHeader( Smtp smtp, const char * hdr )
  return smtp;
  }
  */
-Smtp smtpClearHeaders( Smtp smtp )
+void smtpClearHeaders( Smtp smtp )
 {
     lclear( smtp->headers );
-    return smtp;
 }
 
-Smtp smtpAddFile( Smtp smtp, const char * name, const char * ctype )
+int smtpAddFile( Smtp smtp, const char * name, const char * ctype )
 {
     File file = calloc( sizeof(struct _File), 1 );
     if( !file ) return 0;
@@ -240,59 +285,81 @@ Smtp smtpAddFile( Smtp smtp, const char * name, const char * ctype )
     if( !file->name )
     {
         free( file );
-        return NULL;
+        return 0;
     }
     if( ctype )
     {
         file->ctype = strdup( ctype );
         if( !file->ctype )
         {
-            free( file->name );
-            free( file );
-            return NULL;
+            delFile( file );
+            return 0;
         }
     }
-    ladd( smtp->files, file );
-    return smtp;
+    if( !ladd( smtp->files, file ) )
+    {
+        delFile( file );
+        return 0;
+    }
+    return 1;
 }
-Smtp smtpClearFiles( Smtp smtp )
+
+void smtpClearFiles( Smtp smtp )
 {
     lclear( smtp->files );
-    return smtp;
 }
 
-Smtp smtpSetSubject( Smtp smtp, const char * subj )
+int smtpSetSubject( Smtp smtp, const char * subj )
 {
-    free( smtp->subject );
-    smtp->subject = strdup( subj );
-    return smtp;
+    char * s = strdup( subj );
+    if( s )
+    {
+        free( smtp->subject );
+        smtp->subject = s;
+        return 0;
+    }
+    return 1;
 }
 
-Smtp smtpSetNodename( Smtp smtp, const char * node )
+void smtpSetNodename( Smtp smtp, const char * node )
 {
-    strncpy( smtp->nodename, node, sizeof(smtp->nodename)-1 );
-    return smtp;
+    strncpy( smtp->nodename, node, sizeof(smtp->nodename) - 1 );
 }
 
-Smtp smtpSetXmailer( Smtp smtp, const char * xmailer )
+int smtpSetXmailer( Smtp smtp, const char * xmailer )
 {
-    free( smtp->xmailer );
-    smtp->xmailer = strdup( xmailer );
-    return smtp;
+    char * x = strdup( xmailer );
+    if( x )
+    {
+        free( smtp->xmailer );
+        smtp->xmailer = x;
+        return 1;
+    }
+    return 0;
 }
 
-Smtp smtpSetLogin( Smtp smtp, const char * login )
+int smtpSetLogin( Smtp smtp, const char * login )
 {
-    free( smtp->smtp_user );
-    smtp->smtp_user = strdup( login );
-    return smtp;
+    char * s = strdup( login );
+    if( s )
+    {
+        free( smtp->smtp_user );
+        smtp->smtp_user = s;
+        return 1;
+    }
+    return 0;
 }
 
-Smtp smtpSetPassword( Smtp smtp, const char * password )
+int smtpSetPassword( Smtp smtp, const char * password )
 {
-    free( smtp->smtp_password );
-    smtp->smtp_password = strdup( password );
-    return smtp;
+    char * s = strdup( password );
+    if( s )
+    {
+        free( smtp->smtp_password );
+        smtp->smtp_password = s;
+        return 1;
+    }
+    return 0;
 }
 
 int smtpSetSMTP( Smtp smtp, const char * host, int port )
@@ -305,11 +372,16 @@ int smtpSetSMTP( Smtp smtp, const char * host, int port )
     return 0;
 }
 
-Smtp smtpSetHost( Smtp smtp, const char * server )
+int smtpSetHost( Smtp smtp, const char * server )
 {
-    free( smtp->host );
-    smtp->host = strdup( server );
-    return smtp;
+    char * h = strdup( server );
+    if( h )
+    {
+        free( smtp->host );
+        smtp->host = h;
+        return 1;
+    }
+    return 0;
 }
 
 int smtpSetAuth( Smtp smtp, AuthType auth )
@@ -367,17 +439,17 @@ int smtpSetTimeout( Smtp smtp, int timeout )
  */
 
 /*
-int smtpSendOneMail( Smtp smtp )
-{
-    if( smtpOpenSession( smtp ) )
-    {
-        if( smtpSendMail( smtp ) )
-        {
-            smtpCloseSession( smtp );
-            return 1;
-        }
-    }
-    return 0;
-}
+ int smtpSendOneMail( Smtp smtp )
+ {
+ if( smtpOpenSession( smtp ) )
+ {
+ if( smtpSendMail( smtp ) )
+ {
+ smtpCloseSession( smtp );
+ return 1;
+ }
+ }
+ return 0;
+ }
 
-*/
+ */
