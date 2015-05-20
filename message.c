@@ -9,6 +9,51 @@
 #include "smtp.h"
 #include "mime.h"
 
+#define ENCODED_BLK_SIZE    45
+
+static string encodeb64( const char * prefix, const char * value )
+{
+    string encoded = snew();
+    size_t size = strlen( value );
+    char * first = "";
+    if( !encoded ) return NULL;
+
+    while( size )
+    {
+        string b64;
+        size_t to_encode = size > ENCODED_BLK_SIZE ? ENCODED_BLK_SIZE : size;
+        b64 = base64_encode( value, to_encode );
+        if( !b64 )
+        {
+            sdel( b64 );
+            sdel( encoded );
+            return NULL;
+        }
+        if( !scatc( encoded, first ) || !scatc( encoded, prefix )
+                || !scat( encoded, b64 ) || !scatc( encoded, "?=" ) )
+        {
+            sdel( b64 );
+            sdel( encoded );
+            return NULL;
+        }
+        sdel( b64 );
+        first = " ";
+        size -= to_encode;
+        value += to_encode;
+        if( size )
+        {
+            if( !scatc( encoded, "\r\n") )
+            {
+                sdel( b64 );
+                sdel( encoded );
+                return NULL;
+            }
+        }
+    }
+
+    return encoded;
+}
+
 static int makeEncodedHeader( Smtp smtp, const char * title, const char * value,
         string msg )
 {
@@ -20,9 +65,9 @@ static int makeEncodedHeader( Smtp smtp, const char * title, const char * value,
     }
     else
     {
-        string b64 = base64_sencode( value, smtp->cprefix );
+        string b64 = encodeb64( smtp->cprefix, value );
         if( !b64 ) return 0;
-        if( !scat( msg, b64 ) || !scatc( msg, "?=" ) )
+        if( !scat( msg, b64 ) )
         {
             sdel( b64 );
             return 0;
@@ -50,19 +95,18 @@ static string makeEmail( Smtp smtp, Addr a )
         }
         else
         {
-            string b64 = base64_sencode( a->name, smtp->cprefix );
+            string b64 = encodeb64( smtp->cprefix, a->name );
             if( !b64 )
             {
                 sdel( buf );
                 return NULL;
             }
-            if( !sprint( buf, "%s?= <%s>", sstr( b64 ), a->email ) )
+            if( !sprint( buf, "%s <%s>", sstr( b64 ), a->email ) )
             {
                 sdel( buf );
                 sdel( b64 );
                 return NULL;
             }
-            sdel( b64 );
         }
     }
     else
@@ -257,7 +301,7 @@ static int makeMessage( Smtp smtp, string msg )
         }
         if( *part->cprefix )
         {
-            string b64 = base64_sencode( part->body, NULL );
+            string b64 = base64_sencode( part->body/*, NULL*/);
             if( !b64 )
             {
                 if( boundary != smtp->boundary ) free( boundary );
@@ -338,10 +382,11 @@ static int attachFiles( Smtp smtp, FILE * fout )
         }
         if( !sprint( out, "\r\n--%s\r\n"
                 "Content-Transfer-Encoding: base64\r\n"
-                "Content-Type: %s; name=\"%s\"\r\n"
-                "Content-Disposition: attachment; filename=\"%s\"\r\n"
-                "\r\n", smtp->boundary, mime_type, sstr( mime_name ),
-                sstr( mime_name ) ) )
+                "Content-Type: %s; name=\"%s%s\"\r\n"
+                "Content-Disposition: attachment; filename=\"%s%s\"\r\n"
+                "\r\n", smtp->boundary, mime_type,
+                *smtp->cprefix ? smtp->cprefix : "", sstr( mime_name ),
+                *smtp->cprefix ? smtp->cprefix : "", sstr( mime_name ) ) )
         {
             fclose( f );
             sdel( mime_name );

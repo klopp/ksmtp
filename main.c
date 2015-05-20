@@ -27,6 +27,7 @@ int main( void )
 
     smtpAddTo( smtp, TO );
     smtpSetSubject( smtp, "А вот как насчёт такого очень-очень-очень офигенно длинного поля сабжект?" );
+    //smtpSetSubject( smtp, "А вот как насчёт?" );
 
     smtpAddUtfTextPart( smtp, "ляляля", "plain" );
     smtpAddUtfTextPart( smtp, "кукукук", "html" );
