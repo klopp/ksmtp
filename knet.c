@@ -7,8 +7,6 @@
 
 #include "knet.h"
 
-#define SOCKET_PORTION 4096
-
 int knet_error( ksocket sd )
 {
     return sd->flags & _SOCKET_ERROR;
@@ -103,16 +101,17 @@ void knet_down( void )
 
 int knet_resolve_name( const char *name, struct hostent *hent )
 {
-    int ret = _ERROR;
+    /*int ret = _ERROR;*/
     struct hostent *him;
-
     him = gethostbyname( name );
     if( him )
     {
         memcpy( hent, him, sizeof(struct hostent) );
-        ret = _SUCCESS;
+        return 1;
+        /*ret = _SUCCESS;*/
     }
-    return ret;
+    /*return ret;*/
+    return 0;
 }
 
 ksocket knet_connect( const char *host, int port )
@@ -124,7 +123,8 @@ ksocket knet_connect( const char *host, int port )
     memset( &sin, 0, sizeof(SIN) );
     memset( &him, 0, sizeof(struct hostent) );
 
-    if( knet_resolve_name( host, &him ) != _ERROR )
+    /*if( knet_resolve_name( host, &him ) != _ERROR )*/
+    if( knet_resolve_name( host, &him ) )
     {
         int sd;
         sin.sin_family = PF_INET;
@@ -295,9 +295,10 @@ int knet_getc( ksocket sd )
     return retval;
 }
 
+/*
 int knet_putc( ksocket sd, int ch )
 {
-    int retval = _SUCCESS;
+    //int retval = _SUCCESS;
 
     if( !sd->ssl )
     {
@@ -305,7 +306,8 @@ int knet_putc( ksocket sd, int ch )
         {
             sd->flags |= _SOCKET_ERROR;
             sd->error = errno;
-            retval = _ERROR;
+            return 0;
+            //retval = _ERROR;
         }
     }
     else
@@ -314,12 +316,14 @@ int knet_putc( ksocket sd, int ch )
         {
             sd->flags |= _SOCKET_ERROR;
             sd->error = errno;
-            retval = _ERROR;
+            return 0;
+            //retval = _ERROR;
         }
     }
-
-    return retval;
+    return 1;
+    //return retval;
 }
+*/
 
 /*
  int dnet_readln( ksocket sd, dstrbuf *buf )
@@ -356,7 +360,7 @@ int knet_write( ksocket sd, const char *buf, size_t len )
 //            size_t sendSize = (len > blocklen) ? blocklen : len;
             //            int bytes = send( sd->sock, buf, sendSize, 0 );
             int bytes = send( sd->sock, buf,
-                    (len > SOCKET_PORTION) ? SOCKET_PORTION : len, 0 );
+                    (len > MAXSOCKBUF) ? MAXSOCKBUF : len, 0 );
             if( bytes == -1 )
             {
                 if( errno == EAGAIN )

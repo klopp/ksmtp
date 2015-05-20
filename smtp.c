@@ -6,6 +6,7 @@
  */
 
 #include "ksmtp.h"
+#include "message.h"
 #include "../stringlib/b64.h"
 
 static int smtp_answer( Smtp smtp )
@@ -32,7 +33,7 @@ static int smtp_answer( Smtp smtp )
                 return 0;
             }
 printf( "%s\n", buf );
-            while( (c = knet_getc( smtp->sd )) != '\n' )
+            while( (c = knet_getc( smtp->sd )) != '\n' && !knet_eof( smtp->sd ) )
             {
                 printf( "%c\n", c );
                 if( c == -1 )

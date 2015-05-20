@@ -367,53 +367,7 @@ static int attachFiles( Smtp smtp, FILE * fout )
 
     return 1;
 }
-/*
- static int attachFiles( Smtp mopts )
- {
- int retval = 0;
- File next_file = NULL;
- dstrbuf * out;
 
- if( retval == _ERROR ) return retval;
-
- while( (next_file = (File)dlGetNext( mopts->files )) != NULL )
- {
- dstrbuf *file_type;
- dstrbuf *file_name;
- FILE *current = fopen( next_file->name, "rb" );
- if( !current )
- {
- smtpFormatError( mopts, "Could not open attachment: %s",
- next_file->name );
- retval = _ERROR;
- break;
- }
- // If the user specified an absolute path, just get the file name
- file_type = mimeFiletype( next_file->name, next_file->ctype );
- file_name = mimeFilename( next_file->name );
- out = DSB_NEW;
- dsbPrintf( out, "\r\n--%s\r\n", mopts->boundary->str );
- dsbPrintf( out, "Content-Transfer-Encoding: base64\r\n" );
- dsbPrintf( out, "Content-Type: %s; name=\"%s\"\r\n", file_type->str,
- file_name->str );
- dsbPrintf( out, "Content-Disposition: attachment; filename=\"%s\"\r\n",
- file_name->str );
- dsbPrintf( out, "\r\n" );
-
- mimeB64EncodeFile( current, out );
- retval = smtpSendData( mopts, out->str, out->size );
- dsbDestroy( out );
- dsbDestroy( file_type );
- dsbDestroy( file_name );
- if( retval == _ERROR )
- {
- break;
- }
- }
- return retval;
- }
-
- */
 int processMessage( Smtp smtp, string msg )
 {
     FILE * fout = fopen( "/home/klopp/tmp/ksmtp.log", "w" );

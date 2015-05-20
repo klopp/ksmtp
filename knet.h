@@ -38,7 +38,7 @@ typedef struct sockaddr_in SIN;
 
 enum
 {
-    _ERROR = -6, _SUCCESS = 1, _SOCKET_ERROR = 0x01, _SOCKET_EOF = 0x02
+    /*_ERROR = -6, _SUCCESS = 1, */_SOCKET_ERROR = 0x01, _SOCKET_EOF = 0x02
 };
 
 #define MAXSOCKBUF  4096
@@ -65,5 +65,6 @@ void knet_close( ksocket sd );
 int knet_use_tls( ksocket sd );
 int knet_error( ksocket sd );
 char * knet_error_msg( ksocket sd );
+int knet_eof( ksocket sd );
 
 #endif /* KNET_H_ */

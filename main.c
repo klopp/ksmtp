@@ -36,7 +36,8 @@ int main( void )
 
     smtpAddFile( smtp, "/home/klopp/tmp/проба.png", NULL );
 
-    smtpSendMail( smtp );
+    //smtpSendMail( smtp );
+    smtpSendOneMail( smtp );
 
     return smtpDestroy( smtp, 0 );
 }
