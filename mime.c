@@ -33,7 +33,7 @@ string mimeFileName( const char * name, const char * charset )
      *   name="=?UTF-8?B?0L/RgNC+0LHQsC5wbmc=?="
      */
     if( nameptr ) name = nameptr + 1;
-    if( !isUsAscii( name ) )
+    if( !charset || !isUsAscii( name ) )
     {
         char buf[32];
         sprintf( buf, "=?%s?B?", charset );
