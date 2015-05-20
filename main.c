@@ -15,7 +15,7 @@ int main( void )
 #define PASSWORD    "0UnrsZvNYGby"
 #define HOST        "mail.ibic.se"
 
-#define TO          "klopp@yandex.ru"
+#define TO          "Zazaza <klopp@yandex.ru>"
 
     smtpSetFrom( smtp, "Бумбастик <"USER">" );
 
@@ -33,6 +33,8 @@ int main( void )
     smtpAddHeader( smtp, "X-Custom-Two", "Two" );
 
     smtpAddFile( smtp, "/home/klopp/tmp/проба.png", NULL );
+
+    smtpSendMail( smtp );
 
     return smtpDestroy( smtp, 0 );
 }

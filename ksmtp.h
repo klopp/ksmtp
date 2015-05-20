@@ -55,7 +55,8 @@ typedef struct _TextPart
 {
     char * body;
     char * ctype;
-    char * charset;
+    char charset[32];
+    char cprefix[32];
 }*TextPart;
 
 typedef struct _Smtp
@@ -75,6 +76,7 @@ typedef struct _Smtp
     char nodename[ PATH_MAX + 1 ];
 #endif
     char charset[32];
+    char cprefix[32];
     char *subject;
     char *xmailer;
     char *smtp_user;

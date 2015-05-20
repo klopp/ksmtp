@@ -7,12 +7,12 @@
 
 #include "ksmtp.h"
 #include "addr.h"
+#include "mime.h"
 #include <limits.h>
 
 static void delTextPart( void * ptr )
 {
     TextPart part = (TextPart)ptr;
-    free( part->charset );
     free( part->body );
     free( part->ctype );
     free( part );
@@ -63,19 +63,12 @@ Smtp smtpCreate( void )
     smtp->replyto = calloc( sizeof(struct _Addr), 1 );
     smtp->from = calloc( sizeof(struct _Addr), 1 );
 
-    strncpy( smtp->charset, KSMTP_DEFAULT_CHARSET, sizeof(smtp->charset) - 1 );
-
     smtp->error = snew();
 
-/*
-    smtp->us_ascii = mimeInitUsAscii();
-    smtp->mime_types = mimeInitMimeTypes();
-*/
-
     if( smtp->from && smtp->replyto && smtp->headers && smtp->to && smtp->cc
-            && smtp->bcc && smtp->parts && smtp->files && smtp->error
-            /*&& smtp->us_ascii && smtp->mime_types*/ )
+            && smtp->bcc && smtp->parts && smtp->files && smtp->error )
     {
+        smtpSetCharset( smtp, KSMTP_DEFAULT_CHARSET );
         return smtp;
     }
 
@@ -105,10 +98,10 @@ int smtpDestroy( Smtp smtp, int sig )
     free( smtp->smtp_user );
     free( smtp->smtp_password );
 
-/*
-    TT_destroy( smtp->mime_types );
-    TT_destroy( smtp->us_ascii );
-*/
+    /*
+     TT_destroy( smtp->mime_types );
+     TT_destroy( smtp->us_ascii );
+     */
 
     free( smtp );
     return sig;
@@ -131,12 +124,8 @@ int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype,
         delTextPart( part );
         return 0;
     }
-    part->charset = strdup( charset );
-    if( !part->charset )
-    {
-        delTextPart( part );
-        return 0;
-    }
+    if( !isUsAsciiCs( charset ) ) sprintf( part->cprefix, "=?%s?B?", charset );
+    else *part->cprefix = 0;
     if( !ladd( smtp->parts, part ) )
     {
         delTextPart( part );
@@ -350,6 +339,8 @@ void smtpSetNodename( Smtp smtp, const char * node )
 void smtpSetCharset( Smtp smtp, const char * charset )
 {
     strncpy( smtp->charset, charset, sizeof(smtp->charset) - 1 );
+    if( !isUsAsciiCs( charset ) ) sprintf( smtp->cprefix, "=?%s?B?", charset );
+    else *smtp->cprefix = 0;
 }
 
 int smtpSetXmailer( Smtp smtp, const char * xmailer )

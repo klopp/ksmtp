@@ -13,13 +13,13 @@ static int makeEncodedHeader( Smtp smtp, const char * title, const char * value,
 {
     if( !scatc( msg, title ) || !scatc( msg, ": " ) ) return 0;
 
-    if( isUsAsciiCs( value ) )
+    if( isUsAscii( value ) )
     {
         if( !scatc( msg, value ) ) return 0;
     }
     else
     {
-        string b64 = base64_sencode( value, smtp->charset );
+        string b64 = base64_sencode( value, smtp->cprefix );
         if( !b64 ) return 0;
         if( !scat( msg, b64 ) )
         {
@@ -39,7 +39,7 @@ static string makeEmail( Smtp smtp, Addr a )
 
     if( a->name )
     {
-        if( isUsAsciiCs( a->name ) )
+        if( isUsAscii( a->name ) )
         {
             if( !sprint( buf, "%s <%s>", a->name, a->email ) )
             {
@@ -49,7 +49,7 @@ static string makeEmail( Smtp smtp, Addr a )
         }
         else
         {
-            string b64 = base64_sencode( a->name, smtp->charset );
+            string b64 = base64_sencode( a->name, smtp->cprefix );
             if( !b64 )
             {
                 sdel( buf );
@@ -72,11 +72,6 @@ static string makeEmail( Smtp smtp, Addr a )
             return 0;
         }
     }
-    if( !scatc( buf, "\r\n" ) )
-    {
-        sdel( buf );
-        return 0;
-    }
     return buf;
 }
 
@@ -85,7 +80,7 @@ static int makePartContentType( Smtp smtp, TextPart part, string msg )
     string ct = snew();
     if( !ct ) return 0;
 
-    if( !isUsAscii( part->charset ) )
+    if( !isUsAsciiCs( part->charset ) )
     {
         if( !sprint( ct, "Content-Type: text/%s; charset=%s\r\n"
                 "Content-Disposition: inline\r\n"
@@ -117,18 +112,16 @@ static int makePartContentType( Smtp smtp, TextPart part, string msg )
 
 static int makeOneAddr( Smtp smtp, const char * title, Addr a, string out )
 {
-    if( a )
+    if( a && a->email )
     {
         string buf = makeEmail( smtp, a );
-        if( buf )
+        if( !buf ) return 0;
+        if( !scatc( out, title ) || !scatc( out, ": " ) || !scat( out, buf ) || !scatc( out, "\r\n" ) )
         {
-            if( scatc( out, title ) || scatc( out, ": " ) || !scat( out, buf ) )
-            {
-                sdel( buf );
-                return 1;
-            }
+            sdel( buf );
+            return 0;
         }
-        return 0;
+        sdel( buf );
     }
     return 1;
 }
@@ -190,7 +183,7 @@ static int makeExtraHeaders( Smtp smtp, string msg )
     Header header = lfirst( smtp->headers );
     while( header )
     {
-        if( makeEncodedHeader( smtp, header->title, header->value, msg ) ) return 0;
+        if( !makeEncodedHeader( smtp, header->title, header->value, msg ) ) return 0;
         header = lnext( smtp->headers );
     }
     return 1;
@@ -236,80 +229,83 @@ static int makeMessage( Smtp smtp, string msg )
     return 1;
 }
 /*
-static int makeMessage( Smtp smtp, string msg )
-{
-    TextPart part;
-    char * boundary = smtp->boundary;
+ static int makeMessage( Smtp smtp, string msg )
+ {
+ TextPart part;
+ char * boundary = smtp->boundary;
 
-    part = (TextPart)lfirst( smtp->parts );
-    if( smtp->parts->size > 1 && smtp->files && smtp->files->size )
-    {
-        boundary = mimeMakeBoundary();
-        dsbPrintf( out,
-                "--%s\r\nContent-Type: multipart/alternative; boundary=\"%s\"\r\n",
-                mopts->boundary->str, boundary->str );
-    }
+ part = (TextPart)lfirst( smtp->parts );
+ if( smtp->parts->size > 1 && smtp->files && smtp->files->size )
+ {
+ boundary = mimeMakeBoundary();
+ dsbPrintf( out,
+ "--%s\r\nContent-Type: multipart/alternative; boundary=\"%s\"\r\n",
+ mopts->boundary->str, boundary->str );
+ }
 
-    while( part )
-    {
-        char *ptr = NULL;
-        dstrbuf *enc = NULL;
-        dstrbuf *formatted = DSB_NEW;
-        char previous = '\0';
+ while( part )
+ {
+ char *ptr = NULL;
+ dstrbuf *enc = NULL;
+ dstrbuf *formatted = DSB_NEW;
+ char previous = '\0';
 
-        if( mopts->parts->size > 1 || (mopts->files && mopts->files->size) )
-        {
-            dsbPrintf( out, "\r\n--%s\r\n", boundary->str );
-            printPartContentType( out, part );
-            dsbPrintf( out, "Content-ID: 1\r\n\r\n" );
-        }
+ if( mopts->parts->size > 1 || (mopts->files && mopts->files->size) )
+ {
+ dsbPrintf( out, "\r\n--%s\r\n", boundary->str );
+ printPartContentType( out, part );
+ dsbPrintf( out, "Content-ID: 1\r\n\r\n" );
+ }
 
-        if( part->cs == IS_UTF8 || part->cs == IS_PARTIAL_UTF8 )
-        {
-            if( part->cs == IS_PARTIAL_UTF8 )
-            {
-                enc = mimeQpEncodeString( (u_char *)part->body, true );
-            }
-            else
-            {
-                enc = mimeB64EncodeString( (u_char *)part->body,
-                        strlen( part->body ), true );
-            }
-        }
-        else
-        {
-            enc = DSB_NEW;
-            dsbCat( enc, part->body );
-        }
+ if( part->cs == IS_UTF8 || part->cs == IS_PARTIAL_UTF8 )
+ {
+ if( part->cs == IS_PARTIAL_UTF8 )
+ {
+ enc = mimeQpEncodeString( (u_char *)part->body, true );
+ }
+ else
+ {
+ enc = mimeB64EncodeString( (u_char *)part->body,
+ strlen( part->body ), true );
+ }
+ }
+ else
+ {
+ enc = DSB_NEW;
+ dsbCat( enc, part->body );
+ }
 
-        for( ptr = enc->str; ptr && *ptr != '\0'; previous = *ptr, ptr++ )
-        {
-            dsbCatChar( formatted, *ptr );
-            if( (previous == '\n' || previous == '\r') && *ptr == '.' )
-            {
-                dsbCatChar( formatted, '.' );
-            }
-        }
+ for( ptr = enc->str; ptr && *ptr != '\0'; previous = *ptr, ptr++ )
+ {
+ dsbCatChar( formatted, *ptr );
+ if( (previous == '\n' || previous == '\r') && *ptr == '.' )
+ {
+ dsbCatChar( formatted, '.' );
+ }
+ }
 
-        dsbPrintf( out, "%s\r\n", formatted->str );
-        dsbDestroy( formatted );
-        dsbDestroy( enc );
-        part = (TextPart)dlGetNext( mopts->parts );
-    }
-    if( mopts->parts->size > 1 && mopts->files && mopts->files->size )
-    {
-        dsbPrintf( out, "\r\n--%s--\r\n", boundary->str );
-        dsbDestroy( boundary );
-    }
-    return 0;
-}
-*/
+ dsbPrintf( out, "%s\r\n", formatted->str );
+ dsbDestroy( formatted );
+ dsbDestroy( enc );
+ part = (TextPart)dlGetNext( mopts->parts );
+ }
+ if( mopts->parts->size > 1 && mopts->files && mopts->files->size )
+ {
+ dsbPrintf( out, "\r\n--%s--\r\n", boundary->str );
+ dsbDestroy( boundary );
+ }
+ return 0;
+ }
+ */
 
 int processMessage( Smtp smtp, string msg )
 {
     FILE * fout = fopen( "/home/klopp/tmp/ksmtp.log", "w" );
-    fprintf( fout, "%s\n", sstr(msg) );
-    fclose( fout );
+    if( fout )
+    {
+        fprintf( fout, "%s\n", sstr( msg ) );
+        fclose( fout );
+    }
     return 1;
 }
 

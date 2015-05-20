@@ -31,17 +31,21 @@ static int smtp_answer( Smtp smtp )
                         knet_error_msg( smtp->sd ) );
                 return 0;
             }
+printf( "%s\n", buf );
             while( (c = knet_getc( smtp->sd )) != '\n' )
             {
+                printf( "%c\n", c );
                 if( c == -1 )
                 {
                     smtpFormatError( smtp, "smtp_answer(): %s",
                             knet_error_msg( smtp->sd ) );
+                    printf( "\n" );
                     return 0;
                 }
             }
 
         } while( buf[3] != ' ' );
+        printf( "\n" );
 
         return atoi( buf );
     }
@@ -86,7 +90,7 @@ static int smtp_write( Smtp smtp, const char * buf, size_t size )
 static int smtp_cmd( Smtp smtp, const char * cmd, int ok, int ko )
 {
     int rc;
-    if( !smtp_write( smtp, cmd, strlen( cmd ) ) ) return 0;
+    if( cmd && !smtp_write( smtp, cmd, strlen( cmd ) ) ) return 0;
     rc = smtp_answer( smtp );
     if( !rc ) return 0;
     if( rc == ok ) return rc;
@@ -254,13 +258,13 @@ int smtpOpenSession( Smtp smtp )
         smtpSetError( smtp, "No To: address(es)!" );
         return 0;
     }
-    if( !smtp->from )
+    if( !smtp->from || !smtp->from->email )
     {
         smtpSetError( smtp, "No From: address!" );
         return 0;
     }
     if( smtp->smtp_auth
-            && (smtp->smtp_auth != AUTH_PLAIN || smtp->smtp_auth != AUTH_LOGIN) )
+            && (smtp->smtp_auth != AUTH_PLAIN && smtp->smtp_auth != AUTH_LOGIN) )
     {
         smtpFormatError( smtp, "Unknown AUTH type: %d", smtp->smtp_auth );
         return 0;
