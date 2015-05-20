@@ -68,7 +68,7 @@ Smtp smtpCreate( void )
 
 int smtpDestroy( Smtp smtp, int sig )
 {
-//    dnetClose( smtp->sd );
+    knet_close( smtp->sd );
 
     ldestroy( smtp->parts );
     ldestroy( smtp->files );
@@ -135,13 +135,12 @@ smtpGetError( Smtp smtp )
     return smtp->error->len ? smtp->error->str : NULL;
 }
 
-Smtp smtpSetError( Smtp smtp, const char * error )
+void smtpSetError( Smtp smtp, const char * error )
 {
     scpyc( smtp->error, error );
-    return smtp;
 }
 
-Smtp smtpFormatError( Smtp smtp, const char *fmt, ... )
+void smtpFormatError( Smtp smtp, const char *fmt, ... )
 {
     /*
      va_list ap;
@@ -169,7 +168,6 @@ Smtp smtpFormatError( Smtp smtp, const char *fmt, ... )
      }
      smtp->error->len = actualLen;
      */
-    return smtp;
 }
 
 int smtpSetReplyTo( Smtp smtp, const char * rto )
@@ -249,29 +247,25 @@ int smtpAddTo( Smtp smtp, const char * to )
     return 1;
 }
 
-int smtpAddHeader( Smtp smtp, const char * hdr )
+int smtpAddHeader( Smtp smtp, const char * key, const char * value )
 {
-    char * h = strdup( hdr );
-    if( h )
+    size_t sz = strlen( key ) + strlen( value ) + 8;
+    char * hdr = malloc( sz );
+    if( !hdr ) return 0;
+    sprintf( hdr, "%s: %s", key, value );
+    if( !ladd( smtp->headers, hdr ) )
     {
-        if( !ladd( smtp->headers, h ) )
-        {
-            free( h );
-            return 0;
-        }
+        free( hdr );
+        return 0;
     }
     return 1;
 }
-/*
- Smtp smtpAddHeaderPair( Smtp smtp, const char * key, const char * value )
- {
- dstrbuf * hdr = DSB_NEW;
- dsbPrintf( hdr, "%s: %s", key, value );
- smtpAddHeader( smtp, hdr->str );
- dsbDestroy( hdr );
- return smtp;
- }
- */
+
+int smtpAddXMailer( Smtp smtp, const char * xmailer )
+{
+    return smtpAddHeader( smtp, "X-Mailer", xmailer );
+}
+
 void smtpClearHeaders( Smtp smtp )
 {
     lclear( smtp->headers );

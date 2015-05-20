@@ -11,6 +11,10 @@
 #include "../klib/config.h"
 #include "../lists/list.h"
 #include "../stringlib/stringlib.h"
+
+#include "knet.h"
+#include "smtp.h"
+
 #include <limits.h>
 
 typedef enum _AuthType
@@ -45,7 +49,7 @@ typedef struct _Smtp
     int port;
     int timeout;
 
-//    dsocket *sd;
+    ksocket sd;
     string error;
     char boundary[32];
 #ifndef __WINDOWS__
@@ -73,8 +77,8 @@ typedef struct _Smtp
 Smtp smtpCreate( void );
 int smtpDestroy( Smtp smtp, int retcode );
 const char * smtpGetError( Smtp smtp );
-//Smtp smtpSetError( Smtp smtp, const char * error );
-Smtp smtpFormatError( Smtp smtp, const char *fmt, ... );
+void smtpSetError( Smtp smtp, const char * error );
+void smtpFormatError( Smtp smtp, const char *fmt, ... );
 
 int smtpSetFrom( Smtp smtp, const char * from );
 int smtpSetReplyTo( Smtp smtp, const char * rto );
@@ -100,8 +104,8 @@ int smtpSetLogin( Smtp smtp, const char * login );
 int smtpSetPassword( Smtp smtp, const char * password );
 
 int smtpSetXmailer( Smtp smtp, const char * xmailer );
-int smtpAddHeader( Smtp smtp, const char * hdr );
-//Smtp smtpAddHeaderPair( Smtp smtp, const char * key, const char * val );
+//int smtpAddHeader( Smtp smtp, const char * hdr );
+int smtpAddHeader( Smtp smtp, const char * key, const char * val );
 void smtpClearHeaders( Smtp smtp );
 
 int smtpSetSubject( Smtp smtp, const char * subj );
@@ -109,8 +113,9 @@ int smtpAddTextPart( Smtp smtp, const char * body, const char * ctype, const cha
 int smtpAddUtfTextPart( Smtp smtp, const char * body, const char * ctype );
 
 int smtpOpenSession( Smtp smtp );
-void smtpCloseSession( Smtp smtp );
 int smtpSendMail( Smtp smtp );
+void smtpCloseSession( Smtp smtp );
+
 int smtpSendOneMail( Smtp smtp );
 
 #endif /* KSMTP_H_ */

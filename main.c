@@ -29,8 +29,8 @@ int main( void )
     smtpSetSubject( smtp, "Проба" );
     smtpAddUtfTextPart( smtp, "ляляля", "plain" );
 
-//    smtpAddHeaderPair( smtp, "X-Custom-One", "One" );
-    smtpAddHeader( smtp, "X-Custom-Two: Two" );
+    smtpAddHeader( smtp, "X-Custom-One", "One" );
+    smtpAddHeader( smtp, "X-Custom-Two", "Two" );
 
     smtpAddFile( smtp, "/home/klopp/tmp/проба.png", NULL );
 

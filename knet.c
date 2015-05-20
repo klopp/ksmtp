@@ -113,7 +113,7 @@ int knet_resolve_name( const char *name, struct hostent *hent )
     return ret;
 }
 
-ksocket knet_connect( const char *host, unsigned int port )
+ksocket knet_connect( const char *host, int port )
 {
     SIN sin;
     struct hostent him;
@@ -148,20 +148,20 @@ int knet_use_tls( ksocket sd )
 {
     if( sd->sock <= 0 )
     {
-        return _ERROR;
+        return 0;
     }
 #ifndef __WINDOWS__
     sd->ctx = SSL_CTX_new( TLSv1_client_method() );
     if( !sd->ctx )
     {
-        return _ERROR;
+        return 0;
     }
     sd->ssl = SSL_new( sd->ctx );
     if( !sd->ssl )
     {
         SSL_CTX_free( sd->ctx );
         sd->ctx = NULL;
-        return _ERROR;
+        return 0;
     }
     SSL_set_fd( sd->ssl, sd->sock );
     if( SSL_connect( sd->ssl ) == -1 )
@@ -170,20 +170,20 @@ int knet_use_tls( ksocket sd )
         SSL_free( sd->ssl );
         sd->ssl = NULL;
         sd->ctx = NULL;
-        return _ERROR;
+        return 0;
     }
 #else
     sd->ctx = SSL_CTX_new (SSLv23_client_method());
     if(sd->ctx == NULL)
     {
-        return _ERROR;
+        return _0;
     }
     sd->ssl = SSL_new (sd->ctx);
     if(sd->ssl == NULL)
     {
         SSL_CTX_free(sd->ctx);
         sd->ctx = NULL;
-        return _ERROR;
+        return 0;
     }
     SSL_set_fd (sd->ssl, sd->sock);
     SSL_set_mode(sd->ssl, SSL_MODE_AUTO_RETRY);
@@ -193,24 +193,19 @@ int knet_use_tls( ksocket sd )
         SSL_free(sd->ssl);
         sd->ssl = NULL;
         sd->ctx = NULL;
-        return _ERROR;
+        return 0;
     }
 #endif /* __WINDOWS__ */
 
-    return _SUCCESS;
+    return 1;
 }
 
-int knetverify_sert( ksocket sd )
+int knet_verify_sert( ksocket sd )
 {
-    X509 *cert = NULL;
-    cert = SSL_get_peer_certificate( sd->ssl );
-    if( !cert )
-    {
-        return _ERROR;
-    }
-
+    X509 *cert = SSL_get_peer_certificate( sd->ssl );
+    if( !cert ) return 0;
     X509_free( cert );
-    return _SUCCESS;
+    return 1;
 }
 
 void knet_close( ksocket sd )
@@ -325,27 +320,27 @@ int knet_putc( ksocket sd, int ch )
 }
 
 /*
-int dnet_readln( ksocket sd, dstrbuf *buf )
-{
-    int ch, size = 0;
+ int dnet_readln( ksocket sd, dstrbuf *buf )
+ {
+ int ch, size = 0;
 
-    do
-    {
-        ch = knet_getc( sd );
-        if( ch == -1 )
-        {
-            // Error
-            break;
-        }
-        else
-        {
-            dsbCatChar( buf, ch );
-            size++;
-        }
-    } while( ch != '\n' && !knet_eof( sd ) );
-    return size;
-}
-*/
+ do
+ {
+ ch = knet_getc( sd );
+ if( ch == -1 )
+ {
+ // Error
+ break;
+ }
+ else
+ {
+ dsbCatChar( buf, ch );
+ size++;
+ }
+ } while( ch != '\n' && !knet_eof( sd ) );
+ return size;
+ }
+ */
 
 int knet_write( ksocket sd, const char *buf, size_t len )
 {
