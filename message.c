@@ -305,53 +305,113 @@ static int makeMessage( Smtp smtp, string msg )
 
 static int attachFiles( Smtp smtp, FILE * fout )
 {
+    File file = lfirst( smtp->files );
+
+    while( file )
+    {
+        string mime_name;
+        string b64;
+        string out = snew();
+        const char * mime_type = getMimeType( file->name, file->ctype );
+
+        if( !out )
+        {
+            smtpFormatError( smtp, "attachFile(\"%s\"), internal error 1",
+                    file->name );
+            return 0;
+        }
+        FILE * f = fopen( file->name, "rb" );
+        if( !f )
+        {
+            smtpFormatError( smtp, "attachFile(\"%s\") : %s", file->name,
+                    strerror( errno ) );
+            return 0;
+        }
+        mime_name = mimeFileName( file->name,
+                *smtp->cprefix ? smtp->charset : NULL );
+        if( !mime_name )
+        {
+            fclose( f );
+            smtpFormatError( smtp, "attachFile(\"%s\"), internal error 2",
+                    file->name );
+            return 0;
+        }
+        if( !sprint( out, "\r\n--%s\r\n"
+                "Content-Transfer-Encoding: base64\r\n"
+                "Content-Type: %s; name=\"%s\"\r\n"
+                "Content-Disposition: attachment; filename=\"%s\"\r\n"
+                "\r\n", smtp->boundary, mime_type, sstr(mime_name), sstr(mime_name) ) )
+        {
+            fclose( f );
+            smtpFormatError( smtp, "attachFile(\"%s\"), internal error 3",
+                    file->name );
+            return 0;
+        }
+
+        b64 = base64_fencode( f );
+        if( !b64 )
+        {
+            fclose( f );
+            sdel( mime_name );
+            smtpFormatError( smtp, "attachFile(\"%s\"), internal error 4",
+                    file->name );
+            return 0;
+        }
+
+        fprintf( fout, "%s%s", sstr( out ), sstr( b64 ) );
+        sdel( mime_name );
+        sdel( b64 );
+        sdel( out );
+        file = lnext( smtp->files );
+    }
+
     return 1;
 }
 /*
-static int attachFiles( Smtp mopts )
-{
-    int retval = 0;
-    File next_file = NULL;
-    dstrbuf * out;
+ static int attachFiles( Smtp mopts )
+ {
+ int retval = 0;
+ File next_file = NULL;
+ dstrbuf * out;
 
-    if( retval == _ERROR ) return retval;
+ if( retval == _ERROR ) return retval;
 
-    while( (next_file = (File)dlGetNext( mopts->files )) != NULL )
-    {
-        dstrbuf *file_type;
-        dstrbuf *file_name;
-        FILE *current = fopen( next_file->name, "rb" );
-        if( !current )
-        {
-            smtpFormatError( mopts, "Could not open attachment: %s",
-                    next_file->name );
-            retval = _ERROR;
-            break;
-        }
-        // If the user specified an absolute path, just get the file name
-        file_type = mimeFiletype( next_file->name, next_file->ctype );
-        file_name = mimeFilename( next_file->name );
-        out = DSB_NEW;
-        dsbPrintf( out, "\r\n--%s\r\n", mopts->boundary->str );
-        dsbPrintf( out, "Content-Transfer-Encoding: base64\r\n" );
-        dsbPrintf( out, "Content-Type: %s; name=\"%s\"\r\n", file_type->str,
-                file_name->str );
-        dsbPrintf( out, "Content-Disposition: attachment; filename=\"%s\"\r\n",
-                file_name->str );
-        dsbPrintf( out, "\r\n" );
+ while( (next_file = (File)dlGetNext( mopts->files )) != NULL )
+ {
+ dstrbuf *file_type;
+ dstrbuf *file_name;
+ FILE *current = fopen( next_file->name, "rb" );
+ if( !current )
+ {
+ smtpFormatError( mopts, "Could not open attachment: %s",
+ next_file->name );
+ retval = _ERROR;
+ break;
+ }
+ // If the user specified an absolute path, just get the file name
+ file_type = mimeFiletype( next_file->name, next_file->ctype );
+ file_name = mimeFilename( next_file->name );
+ out = DSB_NEW;
+ dsbPrintf( out, "\r\n--%s\r\n", mopts->boundary->str );
+ dsbPrintf( out, "Content-Transfer-Encoding: base64\r\n" );
+ dsbPrintf( out, "Content-Type: %s; name=\"%s\"\r\n", file_type->str,
+ file_name->str );
+ dsbPrintf( out, "Content-Disposition: attachment; filename=\"%s\"\r\n",
+ file_name->str );
+ dsbPrintf( out, "\r\n" );
 
-        mimeB64EncodeFile( current, out );
-        retval = smtpSendData( mopts, out->str, out->size );
-        dsbDestroy( out );
-        dsbDestroy( file_type );
-        dsbDestroy( file_name );
-        if( retval == _ERROR )
-        {
-            break;
-        }
-    }
-    return retval;
-}
+ mimeB64EncodeFile( current, out );
+ retval = smtpSendData( mopts, out->str, out->size );
+ dsbDestroy( out );
+ dsbDestroy( file_type );
+ dsbDestroy( file_name );
+ if( retval == _ERROR )
+ {
+ break;
+ }
+ }
+ return retval;
+ }
 
  */
 int processMessage( Smtp smtp, string msg )
