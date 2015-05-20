@@ -231,6 +231,88 @@ static int createHeaders( Smtp smtp, string msg )
     return scatc( msg, "\r\n" ) != NULL;
 }
 
+static int makeMessage( Smtp smtp, string msg )
+{
+    return 1;
+}
+/*
+static int makeMessage( Smtp smtp, string msg )
+{
+    TextPart part;
+    char * boundary = smtp->boundary;
+
+    part = (TextPart)lfirst( smtp->parts );
+    if( smtp->parts->size > 1 && smtp->files && smtp->files->size )
+    {
+        boundary = mimeMakeBoundary();
+        dsbPrintf( out,
+                "--%s\r\nContent-Type: multipart/alternative; boundary=\"%s\"\r\n",
+                mopts->boundary->str, boundary->str );
+    }
+
+    while( part )
+    {
+        char *ptr = NULL;
+        dstrbuf *enc = NULL;
+        dstrbuf *formatted = DSB_NEW;
+        char previous = '\0';
+
+        if( mopts->parts->size > 1 || (mopts->files && mopts->files->size) )
+        {
+            dsbPrintf( out, "\r\n--%s\r\n", boundary->str );
+            printPartContentType( out, part );
+            dsbPrintf( out, "Content-ID: 1\r\n\r\n" );
+        }
+
+        if( part->cs == IS_UTF8 || part->cs == IS_PARTIAL_UTF8 )
+        {
+            if( part->cs == IS_PARTIAL_UTF8 )
+            {
+                enc = mimeQpEncodeString( (u_char *)part->body, true );
+            }
+            else
+            {
+                enc = mimeB64EncodeString( (u_char *)part->body,
+                        strlen( part->body ), true );
+            }
+        }
+        else
+        {
+            enc = DSB_NEW;
+            dsbCat( enc, part->body );
+        }
+
+        for( ptr = enc->str; ptr && *ptr != '\0'; previous = *ptr, ptr++ )
+        {
+            dsbCatChar( formatted, *ptr );
+            if( (previous == '\n' || previous == '\r') && *ptr == '.' )
+            {
+                dsbCatChar( formatted, '.' );
+            }
+        }
+
+        dsbPrintf( out, "%s\r\n", formatted->str );
+        dsbDestroy( formatted );
+        dsbDestroy( enc );
+        part = (TextPart)dlGetNext( mopts->parts );
+    }
+    if( mopts->parts->size > 1 && mopts->files && mopts->files->size )
+    {
+        dsbPrintf( out, "\r\n--%s--\r\n", boundary->str );
+        dsbDestroy( boundary );
+    }
+    return 0;
+}
+*/
+
+int processMessage( Smtp smtp, string msg )
+{
+    FILE * fout = fopen( "/home/klopp/tmp/ksmtp.log", "w" );
+    fprintf( fout, "%s\n", sstr(msg) );
+    fclose( fout );
+    return 1;
+}
+
 string createMessage( Smtp smtp )
 {
     string msg = snew();
@@ -246,13 +328,12 @@ string createMessage( Smtp smtp )
         sdel( msg );
         return NULL;
     }
-    /*
-     if( mopts->parts && mopts->parts->size && makeMessage( mopts, buf ) < 0 )
-     {
-     dsbDestroy( buf );
-     buf = NULL;
-     }
-     */
+
+    if( smtp->parts && smtp->parts->size && !makeMessage( smtp, msg ) )
+    {
+        sdel( msg );
+        return NULL;
+    }
     return msg;
 }
 

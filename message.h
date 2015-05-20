@@ -11,5 +11,6 @@
 #include "ksmtp.h"
 
 string createMessage( Smtp smtp );
+int processMessage( Smtp smtp, string msg );
 
 #endif /* MESSAGE_H_ */
