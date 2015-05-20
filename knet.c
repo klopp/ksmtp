@@ -53,7 +53,6 @@ static void _genRandomSeed( void )
     data.euid = geteuid();
     data.gid = getgid();
     data.egid = getegid();
-
     RAND_seed( &data, sizeof(data) );
 
     uniq.pid = getpid();
@@ -101,16 +100,13 @@ void knet_down( void )
 
 int knet_resolve_name( const char *name, struct hostent *hent )
 {
-    /*int ret = _ERROR;*/
     struct hostent *him;
     him = gethostbyname( name );
     if( him )
     {
         memcpy( hent, him, sizeof(struct hostent) );
         return 1;
-        /*ret = _SUCCESS;*/
     }
-    /*return ret;*/
     return 0;
 }
 
@@ -123,7 +119,6 @@ ksocket knet_connect( const char *host, int port )
     memset( &sin, 0, sizeof(struct sockaddr_in) );
     memset( &him, 0, sizeof(struct hostent) );
 
-    /*if( knet_resolve_name( host, &him ) != _ERROR )*/
     if( knet_resolve_name( host, &him ) )
     {
         int sd;
