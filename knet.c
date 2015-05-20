@@ -398,7 +398,7 @@ int knet_write( ksocket sd, const char *buf, size_t len )
 
 int knet_read( ksocket sd, char *buf, size_t size )
 {
-    u_int i;
+    size_t i;
 
     for( i = 0; i < size - 1; i++ )
     {

@@ -8,6 +8,34 @@
 #include "ksmtp.h"
 #include "../stringlib/b64.h"
 
+static int smtp_answer( Smtp smtp )
+{
+    struct timeval tv;
+    fd_set fdset;
+
+    FD_ZERO( &fdset );
+    FD_SET( smtp->sd->sock, &fdset );
+    tv.tv_sec = smtp->timeout;
+    tv.tv_usec = 0;
+    select( smtp->sd->sock + 1, &fdset, NULL, NULL, &tv );
+    if( FD_ISSET( smtp->sd->sock, &fdset ) )
+    {
+        char buf[8];
+        do
+        {
+            memset( buf, 0, sizeof(buf) );
+            if( !knet_read( smtp->sd, buf, 4 ) )
+            {
+                smtpFormatError( smtp, "smtp_answer(): %s",
+                        knet_error_msg( smtp->sd ) );
+                return 0;
+            }
+        } while( buf[3] != ' ' );
+    }
+    smtpSetError( smtp, "smtp_answer(): TIMEOUT" );
+    return 0;
+}
+
 static int smtp_write( Smtp smtp, const char * buf, size_t size )
 {
     int rc = 0;
