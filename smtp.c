@@ -95,6 +95,15 @@ static int smtp_cmd( Smtp smtp, const char * cmd, int ok, int ko )
     if( !rc ) return 0;
     if( rc == ok ) return rc;
     if( ko && rc == ko ) return rc;
+    if( ko )
+    {
+        smtpFormatError( smtp, "smtp_cmd(): want %u or %u, got %u", ok, ko,
+                rc );
+    }
+    else
+    {
+        smtpFormatError( smtp, "smtp_cmd(): want %u, got %u", ok, rc );
+    }
     return 0;
 }
 

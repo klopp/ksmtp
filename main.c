@@ -20,7 +20,7 @@ int main( void )
 */
 
 #define USER        "klopp@yandex.ru"
-#define PASSWORD    "easypass123"
+#define PASSWORD    "easypass1230"
 #define HOST        "smtp.yandex.com"
 #define TO          "Zazaza <kloppspb@bk.ru>"
 
@@ -64,7 +64,7 @@ int main( void )
     if( !smtpSendOneMail( smtp ) )
     {
         knet_down();
-        printf( "[ERROR] (%s)\n", smtpGetError( smtp ) );
+        printf( "ERROR %s\n", smtpGetError( smtp ) );
         return smtpDestroy( smtp, 1 );
     }
 
