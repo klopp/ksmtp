@@ -57,8 +57,11 @@ typedef struct _ksocket
 }*ksocket;
 
 ksocket knet_connect( const char *host, int port );
+int knet_write( ksocket sd, const char *buf, size_t size );
 int knet_verify_sert( ksocket sd );
 void knet_close( ksocket sd );
 int knet_use_tls( ksocket sd );
+int knet_error( ksocket sd );
+char * knet_error_msg( ksocket sd );
 
 #endif /* KNET_H_ */

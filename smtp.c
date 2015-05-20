@@ -8,6 +8,40 @@
 #include "ksmtp.h"
 #include "../stringlib/b64.h"
 
+static int smtp_write( Smtp smtp, const char * buf, size_t size )
+{
+    int rc = 0;
+    struct timeval tv;
+    fd_set fdset;
+
+    FD_ZERO( &fdset );
+    FD_SET( smtp->sd->sock, &fdset );
+    tv.tv_sec = smtp->timeout;
+    tv.tv_usec = 0;
+    rc = select( smtp->sd->sock + 1, NULL, &fdset, NULL, &tv );
+    if( rc == -1 )
+    {
+        smtpSetError( smtp, "smtp_write(): select error" );
+        return 0;
+    }
+    else if( rc )
+    {
+        knet_write( smtp->sd, buf, size );
+        if( knet_error( smtp->sd ) )
+        {
+            smtpFormatError( smtp, "smtp_write(): %s",
+                    knet_error_msg( smtp->sd ) );
+            return 0;
+        }
+    }
+    else
+    {
+        smtpSetError( smtp, "smtp_write(): TIMEOUT" );
+        return 0;
+    }
+    return 1;
+}
+
 static int smtp_cmd( Smtp smtp, const char * cmd, int ok, int ko )
 {
     return 1;
@@ -105,25 +139,10 @@ static int smtp_auth_plain( Smtp smtp )
     buf = snew();
     sprint( buf, "%c%s%c%s", '\0', smtp->smtp_user, '\0', smtp->smtp_password );
     data = base64_encode( sstr( buf ), slen( buf ) );
-    sprint( buf, "%s\r\n", sstr(data) );
-    rc = smtp_cmd( smtp, sstr(data), 235, 0 );
-    sdel(data);
-    sdel(buf);
-    return rc;
-}
-
-static int smtpInitAuth( Smtp smtp )
-{
-    int rc = 0;
-    if( smtp->smtp_auth == AUTH_LOGIN )
-    {
-        rc = smtp_auth_login( smtp );
-    }
-    else if( smtp->smtp_auth == AUTH_PLAIN )
-    {
-        rc = smtp_auth_plain( smtp );
-    }
-
+    sprint( buf, "%s\r\n", sstr( data ) );
+    rc = smtp_cmd( smtp, sstr( data ), 235, 0 );
+    sdel( data );
+    sdel( buf );
     return rc;
 }
 
@@ -175,22 +194,28 @@ int smtpOpenSession( Smtp smtp )
 {
     if( !smtp->host )
     {
-        smtpSetError( smtp, "No SMTP host! " );
+        smtpSetError( smtp, "No SMTP host!" );
         return 0;
     }
     if( smtp->port < 1 )
     {
-        smtpSetError( smtp, "Invalid SMTP port! " );
+        smtpSetError( smtp, "Invalid SMTP port!" );
         return 0;
     }
     if( !smtp->to || smtp->to->size < 1 )
     {
-        smtpSetError( smtp, "No To: address(es)! " );
+        smtpSetError( smtp, "No To: address(es)!" );
         return 0;
     }
     if( !smtp->from )
     {
-        smtpSetError( smtp, "No From: address! " );
+        smtpSetError( smtp, "No From: address!" );
+        return 0;
+    }
+    if( smtp->smtp_auth
+            && (smtp->smtp_auth != AUTH_PLAIN || smtp->smtp_auth != AUTH_LOGIN) )
+    {
+        smtpFormatError( smtp, "Unknown AUTH type: %d", smtp->smtp_auth );
         return 0;
     }
 
@@ -220,9 +245,19 @@ int smtpOpenSession( Smtp smtp )
 
     if( smtp->smtp_auth )
     {
-        if( !smtpInitAuth( smtp ) )
+        if( smtp->smtp_auth == AUTH_LOGIN )
         {
-            return 0;
+            if( !smtp_auth_login( smtp ) )
+            {
+                return 0;
+            }
+        }
+        else
+        {
+            if( !smtp_auth_plain( smtp ) )
+            {
+                return 0;
+            }
         }
     }
     return 1;

@@ -7,6 +7,8 @@
 
 #include "knet.h"
 
+#define SOCKET_PORTION 4096
+
 int knet_error( ksocket sd )
 {
     return sd->flags & _SOCKET_ERROR;
@@ -17,7 +19,7 @@ int knet_eof( ksocket sd )
     return sd->flags & _SOCKET_EOF;
 }
 
-char * knet_get_error( ksocket sd )
+char * knet_error_msg( ksocket sd )
 {
     return strerror( sd->error );
 }
@@ -344,15 +346,17 @@ int knet_putc( ksocket sd, int ch )
 
 int knet_write( ksocket sd, const char *buf, size_t len )
 {
-    size_t sentLen = 0;
+    size_t sent = 0;
 
     if( !sd->ssl )
     {
         while( len > 0 )
         {
-            const size_t blocklen = 4356;
-            size_t sendSize = (len > blocklen) ? blocklen : len;
-            int bytes = send( sd->sock, buf, sendSize, 0 );
+//            const size_t blocklen = 4356;
+//            size_t sendSize = (len > blocklen) ? blocklen : len;
+            //            int bytes = send( sd->sock, buf, sendSize, 0 );
+            int bytes = send( sd->sock, buf,
+                    (len > SOCKET_PORTION) ? SOCKET_PORTION : len, 0 );
             if( bytes == -1 )
             {
                 if( errno == EAGAIN )
@@ -380,16 +384,16 @@ int knet_write( ksocket sd, const char *buf, size_t len )
             {
                 buf += bytes;
                 len -= bytes;
-                sentLen += bytes;
+                sent += bytes;
             }
         }
     }
     else
     {
-        sentLen = SSL_write( sd->ssl, buf, len );
+        sent = SSL_write( sd->ssl, buf, len );
     }
 
-    return sentLen;
+    return sent;
 }
 
 int knet_read( ksocket sd, char *buf, size_t size )
