@@ -26,6 +26,14 @@ static void delAddr( void * ptr )
     free( addr );
 }
 
+static void delHeader( void * ptr )
+{
+    Header header = (Header)ptr;
+    free( header->title );
+    free( header->value );
+    free( header );
+}
+
 static void delFile( void *ptr )
 {
     File file = (File)ptr;
@@ -50,7 +58,7 @@ Smtp smtpCreate( void )
     smtp->bcc = lcreate( delAddr );
     smtp->cc = lcreate( delAddr );
     smtp->to = lcreate( delAddr );
-    smtp->headers = lcreate( free );
+    smtp->headers = lcreate( delHeader );
 
     smtp->replyto = calloc( sizeof(struct _Addr), 1 );
     smtp->from = calloc( sizeof(struct _Addr), 1 );
@@ -263,13 +271,18 @@ int smtpAddTo( Smtp smtp, const char * to )
 
 int smtpAddHeader( Smtp smtp, const char * key, const char * value )
 {
-    size_t sz = strlen( key ) + strlen( value ) + 8;
-    char * hdr = malloc( sz );
-    if( !hdr ) return 0;
-    sprintf( hdr, "%s: %s", key, value );
-    if( !ladd( smtp->headers, hdr ) )
+    Header header = calloc( sizeof(struct _Header), 1 );
+    if( !header ) return 0;
+    header->title = strdup( key );
+    header->value = strdup( value );
+    if( !header->value || !header->title )
     {
-        free( hdr );
+        delHeader( header );
+        return 0;
+    }
+    if( !ladd( smtp->headers, header ) )
+    {
+        delHeader( header );
         return 0;
     }
     return 1;

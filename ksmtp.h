@@ -31,6 +31,12 @@ typedef struct _Addr
     char * email;
 }*Addr;
 
+typedef struct _Header
+{
+    char * title;
+    char * value;
+}*Header;
+
 typedef struct _File
 {
     char * name;

@@ -10,6 +10,7 @@
 
 #include "../klib/config.h"
 #include "../stringlib/stringlib.h"
+#include "../stringlib/b64.h"
 
 int isUsAscii( const char * s );
 int isUsAsciiCs( const char * charset );

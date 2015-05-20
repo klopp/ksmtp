@@ -6,7 +6,6 @@
  */
 
 #include "mime.h"
-#include "../stringlib/b64.h"
 
 int isUsAscii( const char * s )
 {
