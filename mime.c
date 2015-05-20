@@ -39,7 +39,7 @@ string mimeFileName( const char * name, const char * charset )
         char buf[32];
         sprintf( buf, "=?%s?B?", charset );
 */
-        filename = base64_sencode( name/*, buf*/ );
+        filename = base64_sencode( name );
         if( filename )
         {
             if( !scatc( filename, "?=" ) )

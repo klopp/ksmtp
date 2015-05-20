@@ -5,6 +5,9 @@
  *      Author: Vsevolod Lutovinov <klopp@yandex.ru>
  */
 
+/*
+ * TODO set valid error messages
+ */
 #include "ksmtp.h"
 #include "message.h"
 #include "../stringlib/b64.h"
@@ -159,7 +162,7 @@ static int smtp_auth_login( Smtp smtp )
 {
     int rc = 0;
     string buf = snew();
-    string data = base64_sencode( smtp->smtp_user/*, NULL*/ );
+    string data = base64_sencode( smtp->smtp_user );
     sprint( buf, "AUTH LOGIN %s\r\n", sstr( data ) );
     rc = smtp_cmd( smtp, sstr( buf ), 334, 0 );
     if( !rc )
@@ -169,7 +172,7 @@ static int smtp_auth_login( Smtp smtp )
         return 0;
     }
     sdel( data );
-    data = base64_sencode( smtp->smtp_password/*, NULL*/ );
+    data = base64_sencode( smtp->smtp_password );
     sprint( buf, "%s\r\n", sstr( data ) );
     rc = smtp_cmd( smtp, sstr( buf ), 235, 0 );
     sdel( buf );
@@ -186,7 +189,7 @@ static int smtp_auth_plain( Smtp smtp )
 
     buf = snew();
     sprint( buf, "%c%s%c%s", '\0', smtp->smtp_user, '\0', smtp->smtp_password );
-    data = base64_encode( sstr( buf ), slen( buf )/*, NULL*/ );
+    data = base64_encode( sstr( buf ), slen( buf ) );
     sprint( buf, "%s\r\n", sstr( data ) );
     rc = smtp_cmd( smtp, sstr( data ), 235, 0 );
     sdel( data );
