@@ -26,7 +26,7 @@ int main( void )
     smtpSetLogin( smtp, USER );
 
     smtpAddTo( smtp, TO );
-    smtpSetSubject( smtp, "Проба" );
+    smtpSetSubject( smtp, "А вот как насчёт такого очень-очень-очень офигенно длинного поля сабжект?" );
 
     smtpAddUtfTextPart( smtp, "ляляля", "plain" );
     smtpAddUtfTextPart( smtp, "кукукук", "html" );

@@ -255,11 +255,6 @@ static int makeMessage( Smtp smtp, string msg )
                 return 0;
             }
         }
-/*
- * Subject: =?UTF-8?B?0J/RgNC+0LHQsAA=
- * Subject: =?UTF-8?B?UmU6IFVuaWxlYWQuINCS0LDQutCw0L3RgdC40Y8g0LLQtdCxLdGA0LDQt9GA0LDQsdC+?=
-    =?UTF-8?B?0YLRh9C40LrQsA==?=
- */
         if( *part->cprefix )
         {
             string b64 = base64_sencode( part->body, NULL );
@@ -431,109 +426,6 @@ int processMessage( Smtp smtp, string msg )
 
     return smtp_end_data( smtp );
 }
-/*
- FILE * fout = fopen( "/home/klopp/tmp/ksmtp.log", "w" );
- if( !fout ) return 0;
- fprintf( fout, "%s\n", sstr( msg ) );
-
- if( smtp->files && smtp->files->size )
- {
- if( !attachFiles( smtp, fout ) ) return 0;
- }
-
- if( smtp->boundary )
- {
- fprintf( fout, "\r\n--%s--\r\n", smtp->boundary );
- }
-
- fclose( fout );
- return 1;
- */
-/*
- int processMessage( Smtp mopts, dstrbuf *msg )
- {
- int retval = 0, bytes;
- char *ptr = msg->str;
- Addr next = NULL;
-
- retval = smtpSetMailFrom( mopts, mopts->from->email );
-
- if( retval == _ERROR )
- {
- goto end;
- }
-
- while( (next = (Addr)dlGetNext( mopts->to )) != NULL )
- {
- retval = smtpSetRcpt( mopts, next->email );
- if( retval == _ERROR )
- {
- goto end;
- }
- }
- while( (next = (Addr)dlGetNext( mopts->cc )) != NULL )
- {
- retval = smtpSetRcpt( mopts, next->email );
- if( retval == _ERROR )
- {
- goto end;
- }
- }
- while( (next = (Addr)dlGetNext( mopts->bcc )) != NULL )
- {
- retval = smtpSetRcpt( mopts, next->email );
- if( retval == _ERROR )
- {
- goto end;
- }
- }
-
- retval = smtpStartData( mopts );
- if( retval == _ERROR )
- {
- goto end;
- }
- while( *ptr != '\0' )
- {
- bytes = strlen( ptr );
- if( bytes > CHUNK_BYTES )
- {
- bytes = CHUNK_BYTES;
- }
- retval = smtpSendData( mopts, ptr, bytes );
- if( retval == _ERROR )
- {
- goto end;
- }
- ptr += bytes;
- }
-
- if( mopts->files && mopts->files->size )
- {
- retval = attachFiles( mopts );
- if( retval == _ERROR )
- {
- goto end;
- }
- }
-
- if( mopts->boundary )
- {
- if( smtpSendData( mopts, "\r\n--", sizeof("\r\n--") - 1 ) == _ERROR
- || smtpSendData( mopts, mopts->boundary->str,
- mopts->boundary->len ) == _ERROR
- || smtpSendData( mopts, "--\r\n", sizeof("--\r\n") - 1 )
- == _ERROR )
- {
- retval = _ERROR;
- goto end;
- }
- }
- retval = smtpEndData( mopts );
-
- end: return retval != _ERROR;
- }
- */
 
 string createMessage( Smtp smtp )
 {
