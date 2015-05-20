@@ -47,6 +47,17 @@ string mimeFileName( const char * name, const char * charset )
     return filename;
 }
 
+char * mimeMakeBoundary( void )
+{
+    char * boundary = calloc( 33, 1 );
+    if( !boundary ) return NULL;
+
+    strcpy( boundary, "=-" );
+    rnd_string( boundary + 2, 30 );
+
+    return boundary;
+}
+
 int isUsAsciiCs( const char * charset )
 {
     static char * usascii[] =

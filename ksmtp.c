@@ -90,6 +90,7 @@ int smtpDestroy( Smtp smtp, int sig )
 
     sdel( smtp->error );
 
+    free( smtp->boundary );
     free( smtp->subject );
     free( smtp->xmailer );
     free( smtp->host );

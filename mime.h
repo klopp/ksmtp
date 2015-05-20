@@ -15,5 +15,6 @@ int isUsAscii( const char * s );
 int isUsAsciiCs( const char * charset );
 string mimeFileName( const char * name, const char * charset );
 const char * getMimeType( const char * filename, const char * ctype );
+char * mimeMakeBoundary( void );
 
 #endif /* MIME_H_ */
