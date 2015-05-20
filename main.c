@@ -20,7 +20,7 @@ int main( void )
 */
 
 #define USER        "klopp@yandex.ru"
-#define PASSWORD    "easypass1230"
+#define PASSWORD    "easypass123"
 #define HOST        "smtp.yandex.com"
 #define TO          "Zazaza <kloppspb@bk.ru>"
 

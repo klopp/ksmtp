@@ -116,11 +116,11 @@ int knet_resolve_name( const char *name, struct hostent *hent )
 
 ksocket knet_connect( const char *host, int port )
 {
-    SIN sin;
+    struct sockaddr_in sin;
     struct hostent him;
     ksocket ssd = NULL;
 
-    memset( &sin, 0, sizeof(SIN) );
+    memset( &sin, 0, sizeof(struct sockaddr_in) );
     memset( &him, 0, sizeof(struct hostent) );
 
     /*if( knet_resolve_name( host, &him ) != _ERROR )*/
@@ -134,7 +134,7 @@ ksocket knet_connect( const char *host, int port )
         sd = socket( sin.sin_family, SOCK_STREAM, 0 );
         if( sd > 0 )
         {
-            if( connect( sd, (SA *)&sin, sizeof(SIN) ) >= 0 )
+            if( connect( sd,(struct sockaddr *)&sin, sizeof(struct sockaddr_in) ) >= 0 )
             {
                 ssd = calloc( sizeof(struct _ksocket), 1 );
                 ssd->sock = sd;
