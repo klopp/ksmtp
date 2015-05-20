@@ -32,12 +32,14 @@ int main( void )
     smtpAddUtfTextPart( smtp, "кукукук", "html" );
 
     smtpAddHeader( smtp, "X-Custom-One", "One" );
-    smtpAddHeader( smtp, "X-Custom-Two", "Two" );
+//    smtpAddHeader( smtp, "X-Custom-Two", "Two" );
 
     smtpAddFile( smtp, "/home/klopp/tmp/проба.png", NULL );
 
-    //smtpSendMail( smtp );
+//smtpSendMail( smtp );
     smtpSendOneMail( smtp );
+
+    printf( "[%s]\n", smtpGetError( smtp ) );
 
     return smtpDestroy( smtp, 0 );
 }

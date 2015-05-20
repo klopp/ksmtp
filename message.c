@@ -6,6 +6,7 @@
  */
 
 #include "message.h"
+#include "smtp.h"
 #include "mime.h"
 
 static int makeEncodedHeader( Smtp smtp, const char * title, const char * value,
@@ -21,7 +22,7 @@ static int makeEncodedHeader( Smtp smtp, const char * title, const char * value,
     {
         string b64 = base64_sencode( value, smtp->cprefix );
         if( !b64 ) return 0;
-        if( !scat( msg, b64 ) )
+        if( !scat( msg, b64 ) || !scatc( msg, "?=" ) )
         {
             sdel( b64 );
             return 0;
@@ -55,7 +56,7 @@ static string makeEmail( Smtp smtp, Addr a )
                 sdel( buf );
                 return NULL;
             }
-            if( !sprint( buf, "%s <%s>", sstr( b64 ), a->email ) )
+            if( !sprint( buf, "%s?= <%s>", sstr( b64 ), a->email ) )
             {
                 sdel( buf );
                 sdel( b64 );
@@ -254,10 +255,14 @@ static int makeMessage( Smtp smtp, string msg )
                 return 0;
             }
         }
-
+/*
+ * Subject: =?UTF-8?B?0J/RgNC+0LHQsAA=
+ * Subject: =?UTF-8?B?UmU6IFVuaWxlYWQuINCS0LDQutCw0L3RgdC40Y8g0LLQtdCxLdGA0LDQt9GA0LDQsdC+?=
+    =?UTF-8?B?0YLRh9C40LrQsA==?=
+ */
         if( *part->cprefix )
         {
-            string b64 = base64_sencode( part->body, part->cprefix );
+            string b64 = base64_sencode( part->body, NULL );
             if( !b64 )
             {
                 if( boundary != smtp->boundary ) free( boundary );
@@ -340,9 +345,11 @@ static int attachFiles( Smtp smtp, FILE * fout )
                 "Content-Transfer-Encoding: base64\r\n"
                 "Content-Type: %s; name=\"%s\"\r\n"
                 "Content-Disposition: attachment; filename=\"%s\"\r\n"
-                "\r\n", smtp->boundary, mime_type, sstr(mime_name), sstr(mime_name) ) )
+                "\r\n", smtp->boundary, mime_type, sstr( mime_name ),
+                sstr( mime_name ) ) )
         {
             fclose( f );
+            sdel( mime_name );
             smtpFormatError( smtp, "attachFile(\"%s\"), internal error 3",
                     file->name );
             return 0;
@@ -353,12 +360,25 @@ static int attachFiles( Smtp smtp, FILE * fout )
         {
             fclose( f );
             sdel( mime_name );
+            sdel( out );
             smtpFormatError( smtp, "attachFile(\"%s\"), internal error 4",
                     file->name );
             return 0;
         }
 
-        fprintf( fout, "%s%s", sstr( out ), sstr( b64 ) );
+        if( !knet_write( smtp->sd, sstr( out ), slen( out ) )
+                || !knet_write( smtp->sd, sstr( b64 ), slen( b64 ) ) )
+        {
+            fclose( f );
+            sdel( mime_name );
+            sdel( b64 );
+            sdel( out );
+            smtpFormatError( smtp, "attachFile(\"%s\"), internal error 5",
+                    file->name );
+            return 0;
+        }
+
+//        fprintf( fout, "%s%s", sstr( out ), sstr( b64 ) );
         sdel( mime_name );
         sdel( b64 );
         sdel( out );
@@ -370,23 +390,65 @@ static int attachFiles( Smtp smtp, FILE * fout )
 
 int processMessage( Smtp smtp, string msg )
 {
-    FILE * fout = fopen( "/home/klopp/tmp/ksmtp.log", "w" );
-    if( !fout ) return 0;
-    fprintf( fout, "%s\n", sstr( msg ) );
+    Addr addr;
+
+    if( !smtp_mail_from( smtp, smtp->from->email ) ) return 0;
+
+    addr = lfirst( smtp->to );
+    while( addr )
+    {
+        if( !smtp_rcpt_to( smtp, addr->email ) ) return 0;
+        addr = lnext( smtp->to );
+    }
+    addr = lfirst( smtp->cc );
+    while( addr )
+    {
+        if( !smtp_rcpt_to( smtp, addr->email ) ) return 0;
+        addr = lnext( smtp->cc );
+    }
+    addr = lfirst( smtp->bcc );
+    while( addr )
+    {
+        if( !smtp_rcpt_to( smtp, addr->email ) ) return 0;
+        addr = lnext( smtp->bcc );
+    }
+
+    if( !smtp_data( smtp ) ) return 0;
+    if( !knet_write( smtp->sd, sstr( msg ), slen( msg ) ) ) return 0;
 
     if( smtp->files && smtp->files->size )
     {
-        if( !attachFiles( smtp, fout ) ) return 0;
+        if( !attachFiles( smtp, NULL ) ) return 0;
     }
 
     if( smtp->boundary )
     {
-        fprintf( fout, "\r\n--%s--\r\n", smtp->boundary );
+        if( !knet_write( smtp->sd, "\r\n--", sizeof("\r\n--") - 1 )
+                || !knet_write( smtp->sd, smtp->boundary,
+                        strlen( smtp->boundary ) )
+                || !knet_write( smtp->sd, "--\r\n", sizeof("--\r\n") - 1 ) ) return 0;
     }
 
-    fclose( fout );
-    return 1;
+    return smtp_end_data( smtp );
 }
+/*
+ FILE * fout = fopen( "/home/klopp/tmp/ksmtp.log", "w" );
+ if( !fout ) return 0;
+ fprintf( fout, "%s\n", sstr( msg ) );
+
+ if( smtp->files && smtp->files->size )
+ {
+ if( !attachFiles( smtp, fout ) ) return 0;
+ }
+
+ if( smtp->boundary )
+ {
+ fprintf( fout, "\r\n--%s--\r\n", smtp->boundary );
+ }
+
+ fclose( fout );
+ return 1;
+ */
 /*
  int processMessage( Smtp mopts, dstrbuf *msg )
  {

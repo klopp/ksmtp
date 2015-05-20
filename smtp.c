@@ -120,7 +120,7 @@ static int smtp_ehlo( Smtp smtp )
     return rc;
 }
 
-static int smtp_data( Smtp smtp )
+int smtp_data( Smtp smtp )
 {
     return smtp_cmd( smtp, "DATA\r\n", 354, 0 );
 }
@@ -130,7 +130,7 @@ static int smtp_rset( Smtp smtp )
     return smtp_cmd( smtp, "RSET\r\n", 250, 0 );
 }
 
-static int smtp_mail_from( Smtp smtp, const char *email )
+int smtp_mail_from( Smtp smtp, const char * email )
 {
     int rc;
     string buf = snew();
@@ -140,7 +140,7 @@ static int smtp_mail_from( Smtp smtp, const char *email )
     return rc;
 }
 
-static int smtp_rcpt_to( Smtp smtp, const char *email )
+int smtp_rcpt_to( Smtp smtp, const char *email )
 {
     int rc;
     string buf = snew();
@@ -216,7 +216,7 @@ static int smtp_start_tls( Smtp smtp )
     return smtp_cmd( smtp, "STARTTLS\r\n", 220, 0 );
 }
 
-static int smtp_end_data( Smtp smtp )
+int smtp_end_data( Smtp smtp )
 {
     return smtp_cmd( smtp, "\r\n.\r\n", 250, 0 );
 }

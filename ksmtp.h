@@ -10,11 +10,10 @@
 
 #include "../klib/config.h"
 #include "../lists/list.h"
-//#include "../ttree/tstree.h"
 #include "../stringlib/stringlib.h"
 
 #include "knet.h"
-#include "smtp.h"
+//#include "smtp.h"
 
 #include <limits.h>
 
