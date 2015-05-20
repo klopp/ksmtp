@@ -35,6 +35,7 @@ static int smtp_answer( Smtp smtp )
                         knet_error_msg( smtp->sd ) );
                 return 0;
             }
+            scpyc( smtp->current, buf );
             while( (c = knet_getc( smtp->sd )) != '\n' && !knet_eof( smtp->sd ) )
             {
                 if( c == -1 )
@@ -42,6 +43,10 @@ static int smtp_answer( Smtp smtp )
                     smtpFormatError( smtp, "smtp_answer(): %s",
                             knet_error_msg( smtp->sd ) );
                     return 0;
+                }
+                else
+                {
+                    scatch( smtp->current, c );
                 }
             }
 
@@ -95,14 +100,16 @@ static int smtp_cmd( Smtp smtp, const char * cmd, int ok, int ko )
     if( !rc ) return 0;
     if( rc == ok ) return rc;
     if( ko && rc == ko ) return rc;
+    schomp( smtp->current );
     if( ko )
     {
-        smtpFormatError( smtp, "smtp_cmd(): want %u or %u, got %u", ok, ko,
-                rc );
+        smtpFormatError( smtp, "smtp_cmd(): want %u or %u, got [%s]", ok, ko,
+                sstr(smtp->current) );
     }
     else
     {
-        smtpFormatError( smtp, "smtp_cmd(): want %u, got %u", ok, rc );
+        smtpFormatError( smtp, "smtp_cmd(): want %u, got [%s]", ok,
+                sstr(smtp->current) );
     }
     return 0;
 }

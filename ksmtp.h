@@ -68,6 +68,7 @@ typedef struct _Smtp
 
     ksocket sd;
     string error;
+    string current;
     char *boundary;
 #ifndef __WINDOWS__
     char nodename[HOST_NAME_MAX + 1];

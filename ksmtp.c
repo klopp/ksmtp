@@ -64,9 +64,11 @@ Smtp smtpCreate( void )
     smtp->from = calloc( sizeof(struct _Addr), 1 );
 
     smtp->error = snew();
+    smtp->current = snew();
 
     if( smtp->from && smtp->replyto && smtp->headers && smtp->to && smtp->cc
-            && smtp->bcc && smtp->parts && smtp->files && smtp->error )
+            && smtp->bcc && smtp->parts && smtp->files && smtp->error
+            && smtp->current )
     {
         smtpSetCharset( smtp, KSMTP_DEFAULT_CHARSET );
         return smtp;
@@ -90,6 +92,7 @@ int smtpDestroy( Smtp smtp, int sig )
     delAddr( smtp->replyto );
 
     sdel( smtp->error );
+    sdel( smtp->current );
 
     free( smtp->boundary );
     free( smtp->subject );
@@ -142,19 +145,19 @@ int smtpAddUtfTextPart( Smtp smtp, const char * body, const char *ctype )
 }
 
 /*
-const char *
-smtpGetError( Smtp smtp )
-{
-    return smtp->error->len ? smtp->error->str : NULL;
-}
-*/
+ const char *
+ smtpGetError( Smtp smtp )
+ {
+ return smtp->error->len ? smtp->error->str : NULL;
+ }
+ */
 
 /*
-void smtpSetError( Smtp smtp, const char * error )
-{
-    scpyc( smtp->error, error );
-}
-*/
+ void smtpSetError( Smtp smtp, const char * error )
+ {
+ scpyc( smtp->error, error );
+ }
+ */
 
 int smtpSetReplyTo( Smtp smtp, const char * rto )
 {
