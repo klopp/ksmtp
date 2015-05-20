@@ -32,21 +32,17 @@ static int smtp_answer( Smtp smtp )
                         knet_error_msg( smtp->sd ) );
                 return 0;
             }
-printf( "%s\n", buf );
             while( (c = knet_getc( smtp->sd )) != '\n' && !knet_eof( smtp->sd ) )
             {
-                printf( "%c\n", c );
                 if( c == -1 )
                 {
                     smtpFormatError( smtp, "smtp_answer(): %s",
                             knet_error_msg( smtp->sd ) );
-                    printf( "\n" );
                     return 0;
                 }
             }
 
         } while( buf[3] != ' ' );
-        printf( "\n" );
 
         return atoi( buf );
     }

@@ -404,7 +404,7 @@ int knet_read( ksocket sd, char *buf, size_t size )
 {
     size_t i;
 
-    for( i = 0; i < size - 1; i++ )
+    for( i = 0; i < size; i++ )
     {
         int ch = knet_getc( sd );
         if( ch == -1 )
