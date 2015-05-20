@@ -55,10 +55,18 @@ Smtp smtpCreate( void )
     smtp->replyto = calloc( sizeof(struct _Addr), 1 );
     smtp->from = calloc( sizeof(struct _Addr), 1 );
 
+    strncpy( smtp->charset, KSMTP_DEFAULT_CHARSET, sizeof(smtp->charset) - 1 );
+
     smtp->error = snew();
 
+/*
+    smtp->us_ascii = mimeInitUsAscii();
+    smtp->mime_types = mimeInitMimeTypes();
+*/
+
     if( smtp->from && smtp->replyto && smtp->headers && smtp->to && smtp->cc
-            && smtp->bcc && smtp->parts && smtp->files && smtp->error )
+            && smtp->bcc && smtp->parts && smtp->files && smtp->error
+            /*&& smtp->us_ascii && smtp->mime_types*/ )
     {
         return smtp;
     }
@@ -87,6 +95,11 @@ int smtpDestroy( Smtp smtp, int sig )
     free( smtp->host );
     free( smtp->smtp_user );
     free( smtp->smtp_password );
+
+/*
+    TT_destroy( smtp->mime_types );
+    TT_destroy( smtp->us_ascii );
+*/
 
     free( smtp );
     return sig;
@@ -320,6 +333,11 @@ void smtpSetNodename( Smtp smtp, const char * node )
     strncpy( smtp->nodename, node, sizeof(smtp->nodename) - 1 );
 }
 
+void smtpSetCharset( Smtp smtp, const char * charset )
+{
+    strncpy( smtp->charset, charset, sizeof(smtp->charset) - 1 );
+}
+
 int smtpSetXmailer( Smtp smtp, const char * xmailer )
 {
     char * x = strdup( xmailer );
@@ -420,3 +438,10 @@ int smtpSendOneMail( Smtp smtp )
     }
     return 0;
 }
+
+/*
+ static char * usascii[] =
+ { "us-ascii", "ANSI_X3.4-1968", "ANSI_X3.4-1986", "cp367", "csASCII",
+ "IBM367", "iso-ir-6", "ISO646-US", "ISO_646.irv:1991", "ascii",
+ "us", "us-ascii-1968", "x-ansi" };
+ */

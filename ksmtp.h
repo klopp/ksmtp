@@ -10,6 +10,7 @@
 
 #include "../klib/config.h"
 #include "../lists/list.h"
+//#include "../ttree/tstree.h"
 #include "../stringlib/stringlib.h"
 
 #include "knet.h"
@@ -22,6 +23,8 @@ typedef enum _AuthType
     AUTH_LOGIN = 1, AUTH_PLAIN = 2
 } AuthType;
 
+#define KSMTP_DEFAULT_CHARSET   "UTF-8"
+
 typedef struct _Addr
 {
     char * name;
@@ -33,6 +36,14 @@ typedef struct _File
     char * name;
     char * ctype;
 }*File;
+
+/*
+typedef struct _MimeType
+{
+    char * ext;
+    char * mtype;
+}*MimeType;
+*/
 
 typedef struct _TextPart
 {
@@ -57,6 +68,7 @@ typedef struct _Smtp
 #else
     char nodename[ PATH_MAX + 1 ];
 #endif
+    char charset[32];
     char *subject;
     char *xmailer;
     char *smtp_user;
@@ -72,6 +84,12 @@ typedef struct _Smtp
     List bcc;
     Addr from;
     Addr replyto;
+
+/*
+    TTree us_ascii;
+    TTree mime_types;
+*/
+
 }*Smtp;
 
 Smtp smtpCreate( void );
@@ -93,6 +111,7 @@ void smtpClearCc( Smtp smtp );
 void smtpClearBcc( Smtp smtp );
 void smtpClearFiles( Smtp smtp );
 
+void smtpSetCharset( Smtp smtp, const char * charset );
 void smtpSetNodename( Smtp smtp, const char * node );
 int smtpSetTimeout( Smtp smtp, int timeout );
 int smtpSetAuth( Smtp smtp, AuthType auth );
