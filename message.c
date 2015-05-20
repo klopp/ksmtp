@@ -301,7 +301,7 @@ static int makeMessage( Smtp smtp, string msg )
         }
         if( *part->cprefix )
         {
-            string b64 = base64_sencode( part->body/*, NULL*/);
+            string b64 = base64_sencode( part->body );
             if( !b64 )
             {
                 if( boundary != smtp->boundary ) free( boundary );
