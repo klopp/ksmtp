@@ -28,13 +28,13 @@ int main( void )
     smtpAddTo( smtp, TO );
     smtpSetSubject( smtp, "Проба" );
 
-//    smtpAddUtfTextPart( smtp, "ляляля", "plain" );
+    smtpAddUtfTextPart( smtp, "ляляля", "plain" );
     smtpAddUtfTextPart( smtp, "кукукук", "html" );
 
     smtpAddHeader( smtp, "X-Custom-One", "One" );
     smtpAddHeader( smtp, "X-Custom-Two", "Two" );
 
-//    smtpAddFile( smtp, "/home/klopp/tmp/проба.png", NULL );
+    smtpAddFile( smtp, "/home/klopp/tmp/проба.png", NULL );
 
     smtpSendMail( smtp );
 
