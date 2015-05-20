@@ -5,9 +5,6 @@
  *      Author: Vsevolod Lutovinov <klopp@yandex.ru>
  */
 
-/*
- * TODO set valid error messages
- */
 #include "ksmtp.h"
 #include "message.h"
 #include "../stringlib/b64.h"
@@ -202,7 +199,6 @@ static int smtp_auth_plain( Smtp smtp )
     string data;
     int rc = smtp_cmd( smtp, "AUTH PLAIN\r\n", 334, 0 );
     if( !rc ) return 0;
-
     buf = snew();
     sprint( buf, "%c%s%c%s", '\0', smtp->smtp_user, '\0', smtp->smtp_password );
     data = base64_encode( sstr( buf ), slen( buf ) );
