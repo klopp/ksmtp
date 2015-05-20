@@ -44,12 +44,12 @@ typedef struct _File
 }*File;
 
 /*
-typedef struct _MimeType
-{
-    char * ext;
-    char * mtype;
-}*MimeType;
-*/
+ typedef struct _MimeType
+ {
+ char * ext;
+ char * mtype;
+ }*MimeType;
+ */
 
 typedef struct _TextPart
 {
@@ -93,18 +93,17 @@ typedef struct _Smtp
     Addr from;
     Addr replyto;
 
-/*
-    TTree us_ascii;
-    TTree mime_types;
-*/
-
 }*Smtp;
 
 Smtp smtpCreate( void );
 int smtpDestroy( Smtp smtp, int retcode );
-const char * smtpGetError( Smtp smtp );
-void smtpSetError( Smtp smtp, const char * error );
-void smtpFormatError( Smtp smtp, const char *fmt, ... );
+//const char * smtpGetError( Smtp smtp );
+//void smtpSetError( Smtp smtp, const char * error );
+//void smtpFormatError( Smtp smtp, const char *fmt, ... );
+
+#define smtpGetError( smtp ) sstr((smtp)->error)
+#define smtpSetError( smtp, err ) scpyc( (smtp)->error, (err) )
+#define smtpFormatError( smtp, fmt, ... ) sprint( (smtp)->error, (fmt), __VA_ARGS__ )
 
 int smtpSetFrom( Smtp smtp, const char * from );
 int smtpSetReplyTo( Smtp smtp, const char * rto );
@@ -131,12 +130,12 @@ int smtpSetLogin( Smtp smtp, const char * login );
 int smtpSetPassword( Smtp smtp, const char * password );
 
 int smtpSetXmailer( Smtp smtp, const char * xmailer );
-//int smtpAddHeader( Smtp smtp, const char * hdr );
 int smtpAddHeader( Smtp smtp, const char * key, const char * val );
 void smtpClearHeaders( Smtp smtp );
 
 int smtpSetSubject( Smtp smtp, const char * subj );
-int smtpAddTextPart( Smtp smtp, const char * body, const char * ctype, const char * charset );
+int smtpAddTextPart( Smtp smtp, const char * body, const char * ctype,
+        const char * charset );
 int smtpAddUtfTextPart( Smtp smtp, const char * body, const char * ctype );
 
 int smtpOpenSession( Smtp smtp );

@@ -141,46 +141,20 @@ int smtpAddUtfTextPart( Smtp smtp, const char * body, const char *ctype )
     return smtpAddTextPart( smtp, body, ctype, utf8 );
 }
 
+/*
 const char *
 smtpGetError( Smtp smtp )
 {
     return smtp->error->len ? smtp->error->str : NULL;
 }
+*/
 
+/*
 void smtpSetError( Smtp smtp, const char * error )
 {
     scpyc( smtp->error, error );
 }
-
-void smtpFormatError( Smtp smtp, const char *fmt, ... )
-{
-    /*
-     va_list ap;
-     int actualLen = 0;
-
-     while( true )
-     {
-     size_t size = smtp->error->size - smtp->error->len;
-     va_start( ap, fmt );
-     actualLen = vsnprintf( smtp->error->str, size, fmt, ap );
-     va_end( ap );
-     if( actualLen > -1 && (size_t)actualLen < size )
-     {
-     break;
-     }
-     else if( actualLen > -1 )
-     {
-     size = smtp->error->size + (actualLen - size);
-     dsbResize( smtp->error, size + 1 );
-     }
-     else
-     {
-     dsbResize( smtp->error, smtp->error->size * 2 );
-     }
-     }
-     smtp->error->len = actualLen;
-     */
-}
+*/
 
 int smtpSetReplyTo( Smtp smtp, const char * rto )
 {
@@ -444,10 +418,3 @@ int smtpSendOneMail( Smtp smtp )
     }
     return 0;
 }
-
-/*
- static char * usascii[] =
- { "us-ascii", "ANSI_X3.4-1968", "ANSI_X3.4-1986", "cp367", "csASCII",
- "IBM367", "iso-ir-6", "ISO646-US", "ISO_646.irv:1991", "ascii",
- "us", "us-ascii-1968", "x-ansi" };
- */
