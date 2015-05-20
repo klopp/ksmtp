@@ -23,6 +23,7 @@ static int smtp_answer( Smtp smtp )
         char buf[8];
         do
         {
+            int c;
             memset( buf, 0, sizeof(buf) );
             if( !knet_read( smtp->sd, buf, 4 ) )
             {
@@ -30,7 +31,19 @@ static int smtp_answer( Smtp smtp )
                         knet_error_msg( smtp->sd ) );
                 return 0;
             }
+            while( (c = knet_getc( smtp->sd )) != '\n' )
+            {
+                if( c == -1 )
+                {
+                    smtpFormatError( smtp, "smtp_answer(): %s",
+                            knet_error_msg( smtp->sd ) );
+                    return 0;
+                }
+            }
+
         } while( buf[3] != ' ' );
+
+        return atoi( buf );
     }
     smtpSetError( smtp, "smtp_answer(): TIMEOUT" );
     return 0;
@@ -72,7 +85,13 @@ static int smtp_write( Smtp smtp, const char * buf, size_t size )
 
 static int smtp_cmd( Smtp smtp, const char * cmd, int ok, int ko )
 {
-    return 1;
+    int rc;
+    if( !smtp_write( smtp, cmd, strlen( cmd ) ) ) return 0;
+    rc = smtp_answer( smtp );
+    if( !rc ) return 0;
+    if( rc == ok ) return rc;
+    if( ko && rc == ko ) return rc;
+    return 0;
 }
 
 static int smtp_init( Smtp smtp )
