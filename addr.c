@@ -7,6 +7,9 @@
 
 #include "addr.h"
 
+/*
+ * TODO best filtration?
+ */
 static char * _stripName( char *str )
 {
     char *ptr;

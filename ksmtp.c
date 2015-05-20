@@ -414,42 +414,15 @@ int smtpSetTimeout( Smtp smtp, int timeout )
     return 0;
 }
 
-/*
- static int smtpSetInt( int * dest, const char * str )
- {
- char * end;
- long value = strtol(str, &end, 10);
- if( value >= INT_MAX || value <= 0 )
- {
- return 0;
- }
- *dest = (int)value;
- return 1;
- }
-
- static int smtpSetCharPort( Smtp smtp, const char * port )
- {
- return smtpSetInt(&smtp->port, port);
- }
-
- static int smtpSetCharTimeout( Smtp smtp, const char * timeout )
- {
- return smtpSetInt(&smtp->timeout, timeout);
- }
- */
-
-/*
- int smtpSendOneMail( Smtp smtp )
- {
- if( smtpOpenSession( smtp ) )
- {
- if( smtpSendMail( smtp ) )
- {
- smtpCloseSession( smtp );
- return 1;
- }
- }
- return 0;
- }
-
- */
+int smtpSendOneMail( Smtp smtp )
+{
+    if( smtpOpenSession( smtp ) )
+    {
+        if( smtpSendMail( smtp ) )
+        {
+            smtpCloseSession( smtp );
+            return 1;
+        }
+    }
+    return 0;
+}
