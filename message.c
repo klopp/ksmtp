@@ -80,7 +80,7 @@ static int makePartContentType( Smtp smtp, TextPart part, string msg )
     string ct = snew();
     if( !ct ) return 0;
 
-    if( !isUsAsciiCs( part->charset ) )
+    if( *part->cprefix )
     {
         if( !sprint( ct, "Content-Type: text/%s; charset=%s\r\n"
                 "Content-Disposition: inline\r\n"
@@ -116,7 +116,8 @@ static int makeOneAddr( Smtp smtp, const char * title, Addr a, string out )
     {
         string buf = makeEmail( smtp, a );
         if( !buf ) return 0;
-        if( !scatc( out, title ) || !scatc( out, ": " ) || !scat( out, buf ) || !scatc( out, "\r\n" ) )
+        if( !scatc( out, title ) || !scatc( out, ": " ) || !scat( out, buf )
+                || !scatc( out, "\r\n" ) )
         {
             sdel( buf );
             return 0;
@@ -226,77 +227,81 @@ static int createHeaders( Smtp smtp, string msg )
 
 static int makeMessage( Smtp smtp, string msg )
 {
+    TextPart part;
+    char * boundary = smtp->boundary;
+
+    part = (TextPart)lfirst( smtp->parts );
+    if( smtp->parts->size > 1 && smtp->files && smtp->files->size )
+    {
+        boundary = mimeMakeBoundary();
+        if( !boundary ) return 0;
+        if( !scatc( msg, "--" ) || !scatc( msg, smtp->boundary )
+                || !scatc( msg,
+                        "\r\nContent-Type: multipart/alternative; boundary=\"" )
+                || !scatc( msg, boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
+    }
+
+    while( part )
+    {
+        if( smtp->parts->size > 1 || (smtp->files && smtp->files->size) )
+        {
+            if( !scatc( msg, "\r\n--" ) || !scatc( msg, boundary )
+                    || !scatc( msg, "\r\n" )
+                    || !makePartContentType( smtp, part, msg )
+                    || !scatc( msg, "Content-ID: 1\r\n\r\n" ) )
+            {
+                if( boundary != smtp->boundary ) free( boundary );
+                return 0;
+            }
+        }
+
+        if( *part->cprefix )
+        {
+            string b64 = base64_sencode( part->body, part->cprefix );
+            if( !b64 )
+            {
+                if( boundary != smtp->boundary ) free( boundary );
+                return 0;
+            }
+            if( !scat( msg, b64 ) )
+            {
+                sdel( b64 );
+                if( boundary != smtp->boundary ) free( boundary );
+                return 0;
+            }
+            sdel( b64 );
+        }
+        else
+        {
+            if( !scatc( msg, part->body ) )
+            {
+                if( boundary != smtp->boundary ) free( boundary );
+                return 0;
+            }
+        }
+        if( !scatc( msg, "\r\n" ) )
+        {
+            if( boundary != smtp->boundary ) free( boundary );
+            return 0;
+        }
+        part = (TextPart)lnext( smtp->parts );
+    }
+
+    if( boundary != smtp->boundary )
+    {
+        if( !scatc( msg, "\r\n--" ) || !scatc( msg, boundary )
+                || !scatc( msg, "--\r\n" ) )
+        {
+            free( boundary );
+            return 0;
+        }
+        else
+        {
+            free( boundary );
+        }
+    }
     return 1;
 }
-/*
- static int makeMessage( Smtp smtp, string msg )
- {
- TextPart part;
- char * boundary = smtp->boundary;
-
- part = (TextPart)lfirst( smtp->parts );
- if( smtp->parts->size > 1 && smtp->files && smtp->files->size )
- {
- boundary = mimeMakeBoundary();
- dsbPrintf( out,
- "--%s\r\nContent-Type: multipart/alternative; boundary=\"%s\"\r\n",
- mopts->boundary->str, boundary->str );
- }
-
- while( part )
- {
- char *ptr = NULL;
- dstrbuf *enc = NULL;
- dstrbuf *formatted = DSB_NEW;
- char previous = '\0';
-
- if( mopts->parts->size > 1 || (mopts->files && mopts->files->size) )
- {
- dsbPrintf( out, "\r\n--%s\r\n", boundary->str );
- printPartContentType( out, part );
- dsbPrintf( out, "Content-ID: 1\r\n\r\n" );
- }
-
- if( part->cs == IS_UTF8 || part->cs == IS_PARTIAL_UTF8 )
- {
- if( part->cs == IS_PARTIAL_UTF8 )
- {
- enc = mimeQpEncodeString( (u_char *)part->body, true );
- }
- else
- {
- enc = mimeB64EncodeString( (u_char *)part->body,
- strlen( part->body ), true );
- }
- }
- else
- {
- enc = DSB_NEW;
- dsbCat( enc, part->body );
- }
-
- for( ptr = enc->str; ptr && *ptr != '\0'; previous = *ptr, ptr++ )
- {
- dsbCatChar( formatted, *ptr );
- if( (previous == '\n' || previous == '\r') && *ptr == '.' )
- {
- dsbCatChar( formatted, '.' );
- }
- }
-
- dsbPrintf( out, "%s\r\n", formatted->str );
- dsbDestroy( formatted );
- dsbDestroy( enc );
- part = (TextPart)dlGetNext( mopts->parts );
- }
- if( mopts->parts->size > 1 && mopts->files && mopts->files->size )
- {
- dsbPrintf( out, "\r\n--%s--\r\n", boundary->str );
- dsbDestroy( boundary );
- }
- return 0;
- }
- */
 
 int processMessage( Smtp smtp, string msg )
 {
@@ -308,6 +313,92 @@ int processMessage( Smtp smtp, string msg )
     }
     return 1;
 }
+/*
+int processMessage( Smtp mopts, dstrbuf *msg )
+{
+    int retval = 0, bytes;
+    char *ptr = msg->str;
+    Addr next = NULL;
+
+    retval = smtpSetMailFrom( mopts, mopts->from->email );
+
+    if( retval == _ERROR )
+    {
+        goto end;
+    }
+
+    while( (next = (Addr)dlGetNext( mopts->to )) != NULL )
+    {
+        retval = smtpSetRcpt( mopts, next->email );
+        if( retval == _ERROR )
+        {
+            goto end;
+        }
+    }
+    while( (next = (Addr)dlGetNext( mopts->cc )) != NULL )
+    {
+        retval = smtpSetRcpt( mopts, next->email );
+        if( retval == _ERROR )
+        {
+            goto end;
+        }
+    }
+    while( (next = (Addr)dlGetNext( mopts->bcc )) != NULL )
+    {
+        retval = smtpSetRcpt( mopts, next->email );
+        if( retval == _ERROR )
+        {
+            goto end;
+        }
+    }
+
+    retval = smtpStartData( mopts );
+    if( retval == _ERROR )
+    {
+        goto end;
+    }
+    while( *ptr != '\0' )
+    {
+        bytes = strlen( ptr );
+        if( bytes > CHUNK_BYTES )
+        {
+            bytes = CHUNK_BYTES;
+        }
+        retval = smtpSendData( mopts, ptr, bytes );
+        if( retval == _ERROR )
+        {
+            goto end;
+        }
+        ptr += bytes;
+    }
+
+    if( mopts->files && mopts->files->size )
+    {
+        retval = attachFiles( mopts );
+        if( retval == _ERROR )
+        {
+            goto end;
+        }
+    }
+
+    if( mopts->boundary )
+    {
+        if( smtpSendData( mopts, "\r\n--", sizeof("\r\n--") - 1 ) == _ERROR
+                || smtpSendData( mopts, mopts->boundary->str,
+                        mopts->boundary->len ) == _ERROR
+                || smtpSendData( mopts, "--\r\n", sizeof("--\r\n") - 1 )
+                        == _ERROR )
+        {
+            retval = _ERROR;
+            goto end;
+        }
+    }
+    retval = smtpEndData( mopts );
+
+    end: return retval != _ERROR;
+}
+*/
+
 
 string createMessage( Smtp smtp )
 {
@@ -317,6 +408,11 @@ string createMessage( Smtp smtp )
             || (smtp->parts && smtp->parts->size > 1) )
     {
         smtp->boundary = mimeMakeBoundary();
+        if( !smtp->boundary )
+        {
+            sdel( msg );
+            return NULL;
+        }
     }
 
     if( !createHeaders( smtp, msg ) )
