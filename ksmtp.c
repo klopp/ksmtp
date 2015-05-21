@@ -127,7 +127,7 @@ int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype,
         delTextPart( part );
         return 0;
     }
-    strncpy( part->charset, charset, sizeof(part->charset) - 1 );
+    strncpy( part->charset, charset ? charset  : smtp->charset, sizeof(part->charset) - 1 );
     if( !isUsAsciiCs( charset ) ) sprintf( part->cprefix, "=?%s?B?", charset );
     else *part->cprefix = 0;
     if( !ladd( smtp->parts, part ) )
@@ -138,26 +138,16 @@ int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype,
     return 1;
 }
 
+int smtpAddDefTextPart( Smtp smtp, const char * body, const char *ctype )
+{
+    return smtpAddTextPart( smtp, body, ctype, NULL );
+}
+
 int smtpAddUtfTextPart( Smtp smtp, const char * body, const char *ctype )
 {
     static char utf8[] = "UTF-8";
     return smtpAddTextPart( smtp, body, ctype, utf8 );
 }
-
-/*
- const char *
- smtpGetError( Smtp smtp )
- {
- return smtp->error->len ? smtp->error->str : NULL;
- }
- */
-
-/*
- void smtpSetError( Smtp smtp, const char * error )
- {
- scpyc( smtp->error, error );
- }
- */
 
 int smtpSetReplyTo( Smtp smtp, const char * rto )
 {

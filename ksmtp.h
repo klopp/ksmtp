@@ -13,7 +13,6 @@
 #include "../stringlib/stringlib.h"
 
 #include "knet.h"
-//#include "smtp.h"
 
 #include <limits.h>
 
@@ -41,14 +40,6 @@ typedef struct _File
     char * name;
     char * ctype;
 }*File;
-
-/*
- typedef struct _MimeType
- {
- char * ext;
- char * mtype;
- }*MimeType;
- */
 
 typedef struct _TextPart
 {
@@ -97,14 +88,15 @@ typedef struct _Smtp
 
 Smtp smtpCreate( void );
 int smtpDestroy( Smtp smtp, int retcode );
-//const char * smtpGetError( Smtp smtp );
-//void smtpSetError( Smtp smtp, const char * error );
-//void smtpFormatError( Smtp smtp, const char *fmt, ... );
 
 #define smtpGetError( smtp ) sstr((smtp)->error)
 #define smtpSetError( smtp, err ) scpyc( (smtp)->error, (err) )
 #define smtpFormatError( smtp, fmt, ... ) sprint( (smtp)->error, (fmt), __VA_ARGS__ )
 
+/*
+ * smtpSetFrom( smtp, "doe@test.com" )
+ * smtpAddTo( smtp, "John Doe <john@test.com>" )
+ */
 int smtpSetFrom( Smtp smtp, const char * from );
 int smtpSetReplyTo( Smtp smtp, const char * rto );
 
@@ -137,6 +129,7 @@ int smtpSetSubject( Smtp smtp, const char * subj );
 int smtpAddTextPart( Smtp smtp, const char * body, const char * ctype,
         const char * charset );
 int smtpAddUtfTextPart( Smtp smtp, const char * body, const char * ctype );
+int smtpAddDefTextPart( Smtp smtp, const char * body, const char *ctype );
 
 int smtpOpenSession( Smtp smtp );
 int smtpSendMail( Smtp smtp );
