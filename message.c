@@ -382,11 +382,11 @@ static int attachFiles( Smtp smtp, FILE * fout )
         }
         if( !sprint( out, "\r\n--%s\r\n"
                 "Content-Transfer-Encoding: base64\r\n"
-                "Content-Type: %s; name=\"%s%s\"\r\n"
-                "Content-Disposition: attachment; filename=\"%s%s\"\r\n"
+                "Content-Type: %s; name=\"%s\"\r\n"
+                "Content-Disposition: attachment; filename=\"%s\"\r\n"
                 "\r\n", smtp->boundary, mime_type,
-                *smtp->cprefix ? smtp->cprefix : "", sstr( mime_name ),
-                *smtp->cprefix ? smtp->cprefix : "", sstr( mime_name ) ) )
+                sstr( mime_name ),
+                sstr( mime_name ) ) )
         {
             fclose( f );
             sdel( mime_name );

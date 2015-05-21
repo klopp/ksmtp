@@ -33,25 +33,25 @@ string mimeFileName( const char * name, const char * charset )
      *   name="=?UTF-8?B?0L/RgNC+0LHQsC5wbmc=?="
      */
     if( nameptr ) name = nameptr + 1;
-    if( !charset || !isUsAscii( name ) )
+    if( !charset || isUsAsciiCs( charset ) || isUsAscii( name ) )
     {
-/*
-        char buf[32];
-        sprintf( buf, "=?%s?B?", charset );
-*/
-        filename = base64_sencode( name );
-        if( filename )
-        {
-            if( !scatc( filename, "?=" ) )
-            {
-                sdel( filename );
-                return NULL;
-            }
-        }
+        filename = sfromchar( name );
     }
     else
     {
-        filename = sfromchar( name );
+        string b64 = base64_sencode( name );
+        if( b64 )
+        {
+            filename = snew();
+            if( !filename
+                    || !sprint( filename, "=?%s?B?%s?=", charset, sstr( b64 ) ) )
+            {
+                sdel( b64 );
+                sdel( filename );
+                return NULL;
+            }
+            sdel( b64 );
+        }
     }
     return filename;
 }
