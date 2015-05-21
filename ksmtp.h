@@ -22,6 +22,7 @@ typedef enum _AuthType
 } AuthType;
 
 #define KSMTP_DEFAULT_CHARSET   "UTF-8"
+#define KFILE_CONTENT_ID        "file_id_"
 
 typedef struct _Addr
 {
@@ -39,6 +40,7 @@ typedef struct _File
 {
     char * name;
     char * ctype;
+    char cid[sizeof(KFILE_CONTENT_ID) + 8 - (sizeof(KFILE_CONTENT_ID) % 8)];
 }*File;
 
 typedef struct _TextPart
@@ -75,6 +77,7 @@ typedef struct _Smtp
     char *smtp_password;
     char *host;
 
+    size_t lastid;
     List files;
     List parts;
     List headers;
@@ -103,7 +106,7 @@ int smtpSetReplyTo( Smtp smtp, const char * rto );
 int smtpAddTo( Smtp smtp, const char * to );
 int smtpAddCc( Smtp smtp, const char * cc );
 int smtpAddBcc( Smtp smtp, const char * bcc );
-int smtpAddFile( Smtp smtp, const char * file, const char * ctype );
+const char * smtpAddFile( Smtp smtp, const char * file, const char * ctype );
 
 void smtpClearTo( Smtp smtp );
 void smtpClearCc( Smtp smtp );

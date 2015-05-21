@@ -42,7 +42,7 @@ static string encodeb64( const char * prefix, const char * value )
         value += to_encode;
         if( size )
         {
-            if( !scatc( encoded, "\r\n") )
+            if( !scatc( encoded, "\r\n" ) )
             {
                 sdel( b64 );
                 sdel( encoded );
@@ -384,9 +384,9 @@ static int attachFiles( Smtp smtp, FILE * fout )
                 "Content-Transfer-Encoding: base64\r\n"
                 "Content-Type: %s; name=\"%s\"\r\n"
                 "Content-Disposition: attachment; filename=\"%s\"\r\n"
-                "\r\n", smtp->boundary, mime_type,
-                sstr( mime_name ),
-                sstr( mime_name ) ) )
+                "Content-ID: <%s>\r\n"
+                "\r\n", smtp->boundary, mime_type, sstr( mime_name ),
+                sstr( mime_name ), file->cid ) )
         {
             fclose( f );
             sdel( mime_name );

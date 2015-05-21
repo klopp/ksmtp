@@ -17,24 +17,24 @@ int main( void )
                     "<h2>h2</h2>\n"
                     //"<img src=\"http://ato.su/resizer/i/t/d/1/aafde8d5.jpg\" />\n"
                     "<h3>h3</h3>\n"
-                    //"<img src=\"cid:test.png\" />\n"
+                    "<img src=\"cid:file_id_1\" />\n"
                     "<h4>h4</h4>\n"
                     //"<img src=\"test.png\" />\n"
                     "</body></html>";
 
     Smtp smtp = smtpCreate();
 
+/*
      #define USER        "vsevolod.lutovinov@ibic.se"
      #define PASSWORD    "0UnrsZvNYGby"
      #define HOST        "mail.ibic.se"
      #define TO          "Zazaza <klopp@yandex.ru>"
+*/
 
-/*
 #define USER        "klopp@yandex.ru"
 #define PASSWORD    "easypass123"
 #define HOST        "smtp.yandex.com"
 #define TO          "Zazaza <kloppspb@bk.ru>"
-*/
 
     smtp->tls = 1;
     smtpSetFrom( smtp, "Бумбастик <"USER">" );

@@ -255,15 +255,15 @@ void smtpClearHeaders( Smtp smtp )
     lclear( smtp->headers );
 }
 
-int smtpAddFile( Smtp smtp, const char * name, const char * ctype )
+const char * smtpAddFile( Smtp smtp, const char * name, const char * ctype )
 {
     File file = calloc( sizeof(struct _File), 1 );
-    if( !file ) return 0;
+    if( !file ) return NULL;
     file->name = strdup( name );
     if( !file->name )
     {
         free( file );
-        return 0;
+        return NULL;
     }
     if( ctype )
     {
@@ -271,15 +271,18 @@ int smtpAddFile( Smtp smtp, const char * name, const char * ctype )
         if( !file->ctype )
         {
             delFile( file );
-            return 0;
+            return NULL;
         }
     }
+    smtp->lastid++;
+    //file->cid = malloc( sizeof(KFILE_CONTENT_ID) + 8 )
+    sprintf( file->cid, "%s%d", KFILE_CONTENT_ID, smtp->lastid );
     if( !ladd( smtp->files, file ) )
     {
         delFile( file );
-        return 0;
+        return NULL;
     }
-    return 1;
+    return file->cid;
 }
 
 void smtpClearFiles( Smtp smtp )
