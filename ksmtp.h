@@ -22,7 +22,7 @@ typedef enum _AuthType
 } AuthType;
 
 #define KSMTP_DEFAULT_CHARSET   "UTF-8"
-#define KFILE_CONTENT_ID        "file_id_"
+#define KFILE_CONTENT_ID        "file@"
 
 typedef struct _Addr
 {

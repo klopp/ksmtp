@@ -17,7 +17,7 @@ int main( void )
                     "<h2>h2</h2>\n"
                     //"<img src=\"http://ato.su/resizer/i/t/d/1/aafde8d5.jpg\" />\n"
                     "<h3>h3</h3>\n"
-                    "<img src=\"cid:file_id_1\" />\n"
+                    "<img src=\"cid:file@1\" />\n"
                     "<h4>h4</h4>\n"
                     //"<img src=\"test.png\" />\n"
                     "</body></html>";
@@ -34,7 +34,7 @@ int main( void )
 #define USER        "klopp@yandex.ru"
 #define PASSWORD    "easypass123"
 #define HOST        "smtp.yandex.com"
-#define TO          "Zazaza <kloppspb@bk.ru>"
+#define TO          "vsevolod.lutovinov@ibic.se" // "Zazaza <klopp.spb@gmail.com>"
 
     smtp->tls = 1;
     smtpSetFrom( smtp, "Бумбастик <"USER">" );
@@ -57,8 +57,8 @@ int main( void )
     smtpAddHeader( smtp, "X-Custom-One", "One" );
 //    smtpAddHeader( smtp, "X-Custom-Two", "Two" );
 
-//    smtpAddFile( smtp, "/home/klopp/tmp/test.png", NULL );
-    smtpAddFile( smtp, "/home/klopp/tmp/проба.png", NULL );
+    smtpAddFile( smtp, "/home/klopp/tmp/test.png", NULL );
+//    smtpAddFile( smtp, "/home/klopp/tmp/проба.png", NULL );
 
     if( !knet_init( smtp->tls ) )
     {

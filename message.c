@@ -253,7 +253,7 @@ static int createHeaders( Smtp smtp, string msg )
 
     if( smtp->files && smtp->files->size )
     {
-        if( !scatc( msg, "Content-Type: multipart/mixed; boundary=\"" )
+        if( !scatc( msg, "Content-Type: multipart/related; boundary=\"" )
                 || !scatc( msg, smtp->boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
     }
     else if( smtp->parts && smtp->parts->size > 1 )

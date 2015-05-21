@@ -275,7 +275,6 @@ const char * smtpAddFile( Smtp smtp, const char * name, const char * ctype )
         }
     }
     smtp->lastid++;
-    //file->cid = malloc( sizeof(KFILE_CONTENT_ID) + 8 )
     sprintf( file->cid, "%s%d", KFILE_CONTENT_ID, smtp->lastid );
     if( !ladd( smtp->files, file ) )
     {
