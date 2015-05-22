@@ -307,9 +307,18 @@ static int _knet_read_ssl( ksocket sd )
         if( (rc = select( sd->sock + 1, &fdread, &fdwrite, NULL, &timeout ))
                 < 0 )
         {
+            sd->flags |= _SOCKET_ERROR;
+            sd->error = errno;
             return -1;
         }
 
+        if( rc == 0 )
+        {
+            sd->flags |= _SOCKET_ERROR;
+            sd->error = EPIPE;
+            return -1;
+
+        }
         if( FD_ISSET( sd->sock, &fdread )
                 || (read_blocked_on_write && FD_ISSET( sd->sock, &fdwrite )) )
         {
@@ -346,6 +355,8 @@ static int _knet_read_ssl( ksocket sd )
                 }
                 else
                 {
+                    sd->flags |= _SOCKET_ERROR;
+                    sd->error = errno;
                     return -1;
                 }
             }
