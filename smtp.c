@@ -295,7 +295,7 @@ int smtpOpenSession( Smtp smtp )
         return 0;
     }
 
-    if( smtp->tls )
+    if( smtp->flags & KSMTP_USE_TLS )
     {
         if( !smtp_start_tls( smtp ) || !knet_use_tls( &smtp->sd )
                 || !knet_verify_sert( &smtp->sd ) || !smtp_ehlo( smtp ) )

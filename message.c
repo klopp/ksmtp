@@ -252,9 +252,10 @@ static int createHeaders( Smtp smtp, string msg )
 
     if( !scatc( msg, "Mime-Version: 1.0\r\n" ) ) return 0;
 
-    if( smtp->files && smtp->files->size )
+    if( smtp->afiles && smtp->afiles->size )
     {
-        if( !scatc( msg, "Content-Type: multipart/related; boundary=\"" )
+        // TODO related handling
+        if( !scatc( msg, "Content-Type: multipart/mixed; boundary=\"" )
                 || !scatc( msg, smtp->boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
     }
     else if( smtp->parts && smtp->parts->size > 1 )
@@ -277,7 +278,7 @@ static int makeMessage( Smtp smtp, string msg )
     char * boundary = smtp->boundary;
 
     part = (TextPart)lfirst( smtp->parts );
-    if( smtp->parts->size > 1 && smtp->files && smtp->files->size )
+    if( smtp->parts->size > 1 && smtp->afiles && smtp->afiles->size )
     {
         boundary = mimeMakeBoundary();
         if( !boundary ) return 0;
@@ -289,7 +290,7 @@ static int makeMessage( Smtp smtp, string msg )
 
     while( part )
     {
-        if( smtp->parts->size > 1 || (smtp->files && smtp->files->size) )
+        if( smtp->parts->size > 1 || (smtp->afiles && smtp->afiles->size) )
         {
             if( !scatc( msg, "\r\n--" ) || !scatc( msg, boundary )
                     || !scatc( msg, "\r\n" )
@@ -350,7 +351,7 @@ static int makeMessage( Smtp smtp, string msg )
 
 static int attachFiles( Smtp smtp, FILE * fout )
 {
-    File file = lfirst( smtp->files );
+    AFile file = lfirst( smtp->afiles );
 
     while( file )
     {
@@ -385,9 +386,8 @@ static int attachFiles( Smtp smtp, FILE * fout )
                 "Content-Transfer-Encoding: base64\r\n"
                 "Content-Type: %s; name=\"%s\"\r\n"
                 "Content-Disposition: attachment; filename=\"%s\"\r\n"
-                "Content-ID: <%s>\r\n"
                 "\r\n", smtp->boundary, mime_type, sstr( mime_name ),
-                sstr( mime_name ), file->cid ) )
+                sstr( mime_name ) ) )
         {
             fclose( f );
             sdel( mime_name );
@@ -423,7 +423,7 @@ static int attachFiles( Smtp smtp, FILE * fout )
         sdel( mime_name );
         sdel( b64 );
         sdel( out );
-        file = lnext( smtp->files );
+        file = lnext( smtp->afiles );
     }
 
     return 1;
@@ -457,7 +457,7 @@ int processMessage( Smtp smtp, string msg )
     if( !smtp_data( smtp ) ) return 0;
     if( !knet_write( &smtp->sd, sstr( msg ), slen( msg ) ) ) return 0;
 
-    if( smtp->files && smtp->files->size )
+    if( smtp->afiles && smtp->afiles->size )
     {
         if( !attachFiles( smtp, NULL ) ) return 0;
     }
@@ -477,7 +477,7 @@ string createMessage( Smtp smtp )
 {
     string msg = snew();
 
-    if( (smtp->files && smtp->files->size)
+    if( (smtp->afiles && smtp->afiles->size)
             || (smtp->parts && smtp->parts->size > 1) )
     {
         smtp->boundary = mimeMakeBoundary();

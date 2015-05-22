@@ -34,19 +34,28 @@ static void delHeader( void * ptr )
     free( header );
 }
 
-static void delFile( void *ptr )
+static void delAFile( void *ptr )
 {
-    File file = (File)ptr;
+    AFile file = (AFile)ptr;
     free( file->name );
     free( file->ctype );
     free( file );
 }
 
-Smtp smtpCreate( void )
+static void delEFile( void *ptr )
+{
+    EFile file = (EFile)ptr;
+    free( file->name );
+    free( file->ctype );
+    free( file );
+}
+
+Smtp smtpCreate( KsmtpFlags flags )
 {
     Smtp smtp = (Smtp)calloc( sizeof(struct _Smtp), 1 );
     if( !smtp ) return NULL;
 
+    smtp->flags = flags;
     smtp->port = 25;
     smtp->timeout = 10;
     if( gethostname( smtp->nodename, sizeof(smtp->nodename) - 1 ) < 0 )
@@ -54,7 +63,8 @@ Smtp smtpCreate( void )
         strcpy( smtp->nodename, "localhost" );
     }
     smtp->parts = lcreate( delTextPart );
-    smtp->files = lcreate( delFile );
+    smtp->afiles = lcreate( delAFile );
+    smtp->efiles = lcreate( delEFile );
     smtp->bcc = lcreate( delAddr );
     smtp->cc = lcreate( delAddr );
     smtp->to = lcreate( delAddr );
@@ -67,7 +77,7 @@ Smtp smtpCreate( void )
     smtp->current = snew();
 
     if( smtp->from && smtp->replyto && smtp->headers && smtp->to && smtp->cc
-            && smtp->bcc && smtp->parts && smtp->files && smtp->error
+            && smtp->bcc && smtp->parts && smtp->afiles && smtp->efiles && smtp->error
             && smtp->current )
     {
         smtpSetCharset( smtp, KSMTP_DEFAULT_CHARSET );
@@ -82,7 +92,8 @@ int smtpDestroy( Smtp smtp, int sig )
     knet_close( &smtp->sd );
 
     ldestroy( smtp->parts );
-    ldestroy( smtp->files );
+    ldestroy( smtp->afiles );
+    ldestroy( smtp->efiles );
     ldestroy( smtp->headers );
     ldestroy( smtp->to );
     ldestroy( smtp->cc );
@@ -255,9 +266,9 @@ void smtpClearHeaders( Smtp smtp )
     lclear( smtp->headers );
 }
 
-const char * smtpAddFile( Smtp smtp, const char * name, const char * ctype )
+const char * smtpEmbedFile( Smtp smtp, const char * name, const char * ctype )
 {
-    File file = calloc( sizeof(struct _File), 1 );
+    EFile file = calloc( sizeof(struct _EFile), 1 );
     if( !file ) return NULL;
     file->name = strdup( name );
     if( !file->name )
@@ -270,23 +281,56 @@ const char * smtpAddFile( Smtp smtp, const char * name, const char * ctype )
         file->ctype = strdup( ctype );
         if( !file->ctype )
         {
-            delFile( file );
+            delEFile( file );
             return NULL;
         }
     }
     smtp->lastid++;
     sprintf( file->cid, "%s%d", KFILE_CONTENT_ID, smtp->lastid );
-    if( !ladd( smtp->files, file ) )
+    if( !ladd( smtp->afiles, file ) )
     {
-        delFile( file );
+        delEFile( file );
         return NULL;
     }
     return file->cid;
 }
 
-void smtpClearFiles( Smtp smtp )
+int smtpAttachFile( Smtp smtp, const char * name, const char * ctype )
 {
-    lclear( smtp->files );
+    AFile file = calloc( sizeof(struct _AFile), 1 );
+    if( !file ) return 0;
+    file->name = strdup( name );
+    if( !file->name )
+    {
+        free( file );
+        return 0;
+    }
+    if( ctype )
+    {
+        file->ctype = strdup( ctype );
+        if( !file->ctype )
+        {
+            delAFile( file );
+            return 0;
+        }
+    }
+    smtp->lastid++;
+    if( !ladd( smtp->afiles, file ) )
+    {
+        delAFile( file );
+        return 0;
+    }
+    return 1;
+}
+
+void smtpClearAFiles( Smtp smtp )
+{
+    lclear( smtp->afiles );
+}
+
+void smtpClearEFiles( Smtp smtp )
+{
+    lclear( smtp->efiles );
 }
 
 int smtpSetSubject( Smtp smtp, const char * subj )

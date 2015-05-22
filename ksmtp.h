@@ -36,12 +36,18 @@ typedef struct _Header
     char * value;
 }*Header;
 
-typedef struct _File
+typedef struct _AFile
+{
+    char * name;
+    char * ctype;
+}*AFile;
+
+typedef struct _EFile
 {
     char * name;
     char * ctype;
     char cid[sizeof(KFILE_CONTENT_ID) + 8 - (sizeof(KFILE_CONTENT_ID) % 8)];
-}*File;
+}*EFile;
 
 typedef struct _TextPart
 {
@@ -51,10 +57,14 @@ typedef struct _TextPart
     char cprefix[32];
 }*TextPart;
 
+typedef enum _KsmtpFlags
+{
+    KSMTP_DEBUG = 0x01, KSMTP_USE_TLS = 0x02, KSMTP_DEFAULT = 0x00
+} KsmtpFlags;
+
 typedef struct _Smtp
 {
-    int tls;
-    int debug;
+    KsmtpFlags flags;
 
     int port;
     int timeout;
@@ -78,7 +88,8 @@ typedef struct _Smtp
     char *host;
 
     size_t lastid;
-    List files;
+    List afiles;
+    List efiles;
     List parts;
     List headers;
     List to;
@@ -89,7 +100,7 @@ typedef struct _Smtp
 
 }*Smtp;
 
-Smtp smtpCreate( void );
+Smtp smtpCreate( KsmtpFlags flags );
 int smtpDestroy( Smtp smtp, int retcode );
 
 #define smtpGetError( smtp ) sstr((smtp)->error)
@@ -106,12 +117,14 @@ int smtpSetReplyTo( Smtp smtp, const char * rto );
 int smtpAddTo( Smtp smtp, const char * to );
 int smtpAddCc( Smtp smtp, const char * cc );
 int smtpAddBcc( Smtp smtp, const char * bcc );
-const char * smtpAddFile( Smtp smtp, const char * file, const char * ctype );
+int smtpAttachFile( Smtp smtp, const char * file, const char * ctype );
+const char * smtpEmbedFile( Smtp smtp, const char * file, const char * ctype );
 
 void smtpClearTo( Smtp smtp );
 void smtpClearCc( Smtp smtp );
 void smtpClearBcc( Smtp smtp );
-void smtpClearFiles( Smtp smtp );
+void smtpClearAFiles( Smtp smtp );
+void smtpClearEFiles( Smtp smtp );
 
 void smtpSetCharset( Smtp smtp, const char * charset );
 void smtpSetNodename( Smtp smtp, const char * node );
