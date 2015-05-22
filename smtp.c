@@ -267,7 +267,7 @@ int smtpOpenSession( Smtp smtp )
 
     if( smtp->flags & KSMTP_USE_TLS )
     {
-        if( !smtp_start_tls( smtp ) || !knet_use_tls( &smtp->sd )
+        if( !smtp_start_tls( smtp ) || !knet_init_tls( &smtp->sd )
                 || !knet_verify_sert( &smtp->sd ) || !smtp_ehlo( smtp ) )
         {
             smtpFormatError( smtp, "Could not initialize TLS for %s:%d",

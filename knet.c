@@ -102,7 +102,7 @@ int knet_connect( ksocket sd, const char * host, int port )
     return 0;
 }
 
-int knet_use_tls( ksocket sd )
+int knet_init_tls( ksocket sd )
 {
     _rand_seed();
     SSL_load_error_strings();
