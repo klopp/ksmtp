@@ -78,14 +78,14 @@ int knet_connect( ksocket sd, const char * host, int port )
     struct hostent * he = gethostbyname( host );
     if( !he ) return 1;
 
-    memset( &sa, 0, sizeof(sa) );
-    sa.sin_family = PF_INET;
-    sa.sin_port = htons( port );
-    memcpy( &sa.sin_addr.s_addr, he->h_addr_list[0],
-            sizeof(sa.sin_addr.s_addr) );
-    sd->sock = socket( sa.sin_family, SOCK_STREAM, 0 );
+    sd->sock = socket( PF_INET, SOCK_STREAM, 0 );
     if( sd->sock > 0 )
     {
+        memset( &sa, 0, sizeof(sa) );
+        sa.sin_family = PF_INET;
+        sa.sin_port = htons( port );
+        memcpy( &sa.sin_addr.s_addr, he->h_addr_list[0],
+                sizeof(sa.sin_addr.s_addr) );
         if( connect( sd->sock, (struct sockaddr *)&sa, sizeof(sa) ) >= 0 )
         {
             return 1;
