@@ -228,7 +228,78 @@ int knet_write( ksocket sd, const char *buf, size_t len )
 
 static int _knet_read_ssl( ksocket sd )
 {
-    return SSL_read( sd->ssl, sd->buf, SOCK_BUF_LEN );
+    int rc = 0;
+    int readed = 0;
+    int ssl_err;
+    fd_set fdread;
+    fd_set fdwrite;
+    struct timeval timeout;
+    int read_blocked_on_write = 0;
+    int bFinish = 0;
+
+    timeout.tv_sec = sd->timeout;
+    timeout.tv_usec = 0;
+
+    while( !bFinish )
+    {
+        FD_ZERO( &fdread );
+        FD_ZERO( &fdwrite );
+
+        FD_SET( sd->sock, &fdread );
+
+        if( read_blocked_on_write )
+        {
+            FD_SET( sd->sock, &fdwrite );
+        }
+
+        if( (rc = select( sd->sock + 1, &fdread, &fdwrite, NULL, &timeout ))
+                < 0 )
+        {
+            return -1;
+        }
+
+        if( FD_ISSET( sd->sock, &fdread )
+                || (read_blocked_on_write && FD_ISSET( sd->sock, &fdwrite )) )
+        {
+            while( 1 )
+            {
+                read_blocked_on_write = 0;
+
+                rc = SSL_read( sd->ssl, sd->buf + readed,
+                SOCK_BUF_LEN - readed );
+
+                ssl_err = SSL_get_error( sd->ssl, rc );
+                if( ssl_err == SSL_ERROR_NONE )
+                {
+                    readed += rc;
+                    if( !SSL_pending( sd->ssl ) )
+                    {
+                        bFinish = 1;
+                        break;
+                    }
+                }
+                else if( ssl_err == SSL_ERROR_ZERO_RETURN )
+                {
+                    bFinish = 1;
+                    break;
+                }
+                else if( ssl_err == SSL_ERROR_WANT_READ )
+                {
+                    break;
+                }
+                else if( ssl_err == SSL_ERROR_WANT_WRITE )
+                {
+                    read_blocked_on_write = 1;
+                    break;
+                }
+                else
+                {
+                    return -1;
+                }
+            }
+        }
+    }
+    return readed;
 }
 
 static int _knet_read_socket( ksocket sd )
