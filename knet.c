@@ -93,7 +93,7 @@ int knet_connect( ksocket sd, const char * host, int port )
             return 1;
         }
 #if defined(_MSC_VER)
-        closeksocket( sd->sock );
+        closesocket( sd->sock );
 #else
         close( sd->sock );
 #endif
@@ -146,7 +146,7 @@ void knet_close( ksocket sd )
     if( sd->sock >= 0 )
     {
 #if defined(_MSC_VER)
-        closeksocket( sd->sock );
+        closesocket( sd->sock );
 #else
         close( sd->sock );
 #endif
