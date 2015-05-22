@@ -77,8 +77,8 @@ Smtp smtpCreate( KsmtpFlags flags )
     smtp->current = snew();
 
     if( smtp->from && smtp->replyto && smtp->headers && smtp->to && smtp->cc
-            && smtp->bcc && smtp->parts && smtp->afiles && smtp->efiles && smtp->error
-            && smtp->current )
+            && smtp->bcc && smtp->parts && smtp->afiles && smtp->efiles
+            && smtp->error && smtp->current )
     {
         smtpSetCharset( smtp, KSMTP_DEFAULT_CHARSET );
         return smtp;
@@ -105,7 +105,6 @@ int smtpDestroy( Smtp smtp, int sig )
     sdel( smtp->error );
     sdel( smtp->current );
 
-    /*free( smtp->boundary );*/
     free( smtp->subject );
     free( smtp->xmailer );
     free( smtp->host );
@@ -116,13 +115,20 @@ int smtpDestroy( Smtp smtp, int sig )
     return sig;
 }
 
-/*
- * TODO check if part with ctype (and/or charset?) exists?
- */
 int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype,
         const char * charset )
 {
-    TextPart part = malloc( sizeof(struct _TextPart) );
+    TextPart part = (TextPart)lfirst( smtp->parts );
+    while( part )
+    {
+        if( !strcasecmp( part->ctype, ctype ) )
+        {
+            // TODO check if part with ctype (and/or charset?) exists?
+        }
+        part = (TextPart)lnext( smtp->parts );
+    }
+
+    part = malloc( sizeof(struct _TextPart) );
     if( !part ) return 0;
     part->body = strdup( body );
     if( !part->body )
@@ -136,8 +142,10 @@ int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype,
         delTextPart( part );
         return 0;
     }
-    strncpy( part->charset, charset ? charset : smtp->charset, sizeof(part->charset) - 1 );
-    if( !isUsAsciiCs( part->charset ) ) sprintf( part->cprefix, "=?%s?B?", charset );
+    strncpy( part->charset, charset ? charset : smtp->charset,
+            sizeof(part->charset) - 1 );
+    if( !isUsAsciiCs( part->charset ) ) sprintf( part->cprefix, "=?%s?B?",
+            charset );
     else *part->cprefix = 0;
     if( !ladd( smtp->parts, part ) )
     {
