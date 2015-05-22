@@ -302,108 +302,7 @@ string createHeaders( Smtp smtp )
         return NULL;
     }
     return headers;
-
-    /*
-     if( !scatc( msg, "Mime-Version: 1.0\r\n" ) ) return 0;
-
-     if( smtp->afiles->size )
-     {
-     if( !scatc( msg, "Content-Type: multipart/mixed; boundary=\"" )
-     || !scatc( msg, smtp->boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
-     }
-     else if( smtp->parts->size > 1 )
-     {
-     if( !scatc( msg, "Content-Type: multipart/alternative; boundary=\"" )
-     || !scatc( msg, smtp->boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
-     }
-     else
-     {
-     TextPart part = (TextPart)lfirst( smtp->parts );
-     if( part && !makePartContentType( smtp, part, msg ) ) return 0;
-     }
-
-     return scatc( msg, "\r\n" ) != NULL;
-     */
 }
-
-/*
- static int makeMessage( Smtp smtp, string msg )
- {
- TextPart part;
- char * boundary = smtp->boundary;
-
- part = (TextPart)lfirst( smtp->parts );
- if( smtp->parts->size > 1 && smtp->afiles->size )
- {
- boundary = mimeMakeBoundary();
- if( !boundary ) return 0;
- if( !scatc( msg, "--" ) || !scatc( msg, smtp->boundary )
- || !scatc( msg,
- "\r\nContent-Type: multipart/alternative; boundary=\"" )
- || !scatc( msg, boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
- }
-
- while( part )
- {
- if( smtp->parts->size > 1 || smtp->afiles->size )
- {
- if( !scatc( msg, "\r\n--" ) || !scatc( msg, boundary )
- || !scatc( msg, "\r\n" )
- || !makePartContentType( smtp, part, msg )
- || !scatc( msg, "Content-ID: 1\r\n\r\n" ) )
- {
- if( boundary != smtp->boundary ) free( boundary );
- return 0;
- }
- }
- if( *part->cprefix )
- {
- string b64 = base64_sencode( part->body );
- if( !b64 )
- {
- if( boundary != smtp->boundary ) free( boundary );
- return 0;
- }
- if( !scat( msg, b64 ) )
- {
- sdel( b64 );
- if( boundary != smtp->boundary ) free( boundary );
- return 0;
- }
- sdel( b64 );
- }
- else
- {
- if( !scatc( msg, part->body ) )
- {
- if( boundary != smtp->boundary ) free( boundary );
- return 0;
- }
- }
- if( !scatc( msg, "\r\n" ) )
- {
- if( boundary != smtp->boundary ) free( boundary );
- return 0;
- }
- part = (TextPart)lnext( smtp->parts );
- }
-
- if( boundary != smtp->boundary )
- {
- if( !scatc( msg, "\r\n--" ) || !scatc( msg, boundary )
- || !scatc( msg, "--\r\n" ) )
- {
- free( boundary );
- return 0;
- }
- else
- {
- free( boundary );
- }
- }
- return 1;
- }
- */
 
 static int ksmtp_write( Smtp smtp, const char * buf, size_t len, FILE * log )
 {
@@ -530,7 +429,9 @@ int processMessage( Smtp smtp, string headers )
     char r_boundary[36];
     string textparts = NULL;
     string related = NULL;
+    string multipart = NULL;
     FILE * log = NULL;
+    int rc = 1;
 
     if( smtp->flags & KSMTP_DEBUG )
     {
@@ -539,8 +440,8 @@ int processMessage( Smtp smtp, string headers )
 
     if( !smtp_mail_from( smtp, smtp->from->email ) )
     {
-        fclose( log );
-        return 0;
+        rc = 0;
+        goto pmend;
     }
 
     addr = lfirst( smtp->to );
@@ -548,8 +449,8 @@ int processMessage( Smtp smtp, string headers )
     {
         if( !smtp_rcpt_to( smtp, addr->email ) )
         {
-            fclose( log );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
         addr = lnext( smtp->to );
     }
@@ -558,8 +459,8 @@ int processMessage( Smtp smtp, string headers )
     {
         if( !smtp_rcpt_to( smtp, addr->email ) )
         {
-            fclose( log );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
         addr = lnext( smtp->cc );
     }
@@ -568,8 +469,8 @@ int processMessage( Smtp smtp, string headers )
     {
         if( !smtp_rcpt_to( smtp, addr->email ) )
         {
-            fclose( log );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
         addr = lnext( smtp->bcc );
     }
@@ -577,15 +478,15 @@ int processMessage( Smtp smtp, string headers )
     if( !smtp_data( smtp )
             || !ksmtp_write( smtp, sstr( headers ), slen( headers ), log ) )
     {
-        fclose( log );
-        return 0;
+        rc = 0;
+        goto pmend;
     }
 
     textparts = makeTextParts( smtp );
     if( !textparts )
     {
-        fclose( log );
-        return 0;
+        rc = 0;
+        goto pmend;
     }
     if( smtp->efiles->size )
     {
@@ -594,128 +495,89 @@ int processMessage( Smtp smtp, string headers )
         if( !related || !scatc( related, r_boundary )
                 || !scatc( related, "\"\r\n\r\n" ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
     }
 
     if( smtp->afiles->size )
     {
         mimeMakeBoundary( mp_boundary );
-        string multipart = sfromchar(
-                "Content-Type: multipart/mixed; boundary=\"" );
+        multipart = sfromchar( "Content-Type: multipart/mixed; boundary=\"" );
         if( !multipart || !scatc( multipart, mp_boundary )
                 || !scatc( multipart, "\"\r\n\r\n" ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( multipart );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
         if( !ksmtp_write( smtp, sstr( multipart ), slen( multipart ), log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( multipart );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
         if( slen(textparts) && !write_boundary( smtp, mp_boundary, log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( multipart );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
         if( related
                 && !ksmtp_write( smtp, sstr( related ), slen( related ), log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( multipart );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
         if( slen( textparts ) )
         {
             if( !ksmtp_write( smtp, sstr( textparts ), slen( textparts ),
                     log ) )
             {
-                fclose( log );
-                sdel( textparts );
-                sdel( multipart );
-                sdel( related );
-                return 0;
+                rc = 0;
+                goto pmend;
             }
         }
         if( related && !write_boundary_end( smtp, r_boundary, log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( multipart );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
 
         if( !attachFiles( smtp, mp_boundary, log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( multipart );
-            sdel( related );
-            return 0;
-
+            rc = 0;
+            goto pmend;
         }
         if( !write_boundary_end( smtp, mp_boundary, log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( multipart );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
-        sdel( multipart );
     }
     else if( smtp->efiles->size )
     {
         if( !ksmtp_write( smtp, sstr( related ), slen( related ), log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
         if( !write_boundary( smtp, r_boundary, log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
         if( !ksmtp_write( smtp, sstr( textparts ), slen( textparts ), log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
         if( !embedFiles( smtp, r_boundary, log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
         if( !write_boundary_end( smtp, r_boundary, log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            sdel( related );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
     }
     else
@@ -724,14 +586,13 @@ int processMessage( Smtp smtp, string headers )
                 && !ksmtp_write( smtp, sstr( textparts ), slen( textparts ),
                         log ) )
         {
-            fclose( log );
-            sdel( textparts );
-            return 0;
+            rc = 0;
+            goto pmend;
         }
     }
-
-    fclose( log );
+    pmend: if( log ) fclose( log );
     sdel( textparts );
+    sdel( multipart );
     sdel( related );
-    return smtp_end_data( smtp );
+    return rc ? smtp_end_data( smtp ) : 0;
 }

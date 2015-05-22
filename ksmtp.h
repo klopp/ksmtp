@@ -79,7 +79,7 @@ typedef struct _Smtp
     char nodename[ PATH_MAX + 1 ];
 #endif
     char charset[32];
-    char cprefix[32];
+    char cprefix[42];
     char *subject;
     char *xmailer;
     char *smtp_user;
@@ -107,10 +107,6 @@ int smtpDestroy( Smtp smtp, int retcode );
 #define smtpSetError( smtp, err ) scpyc( (smtp)->error, (err) )
 #define smtpFormatError( smtp, fmt, ... ) sprint( (smtp)->error, (fmt), __VA_ARGS__ )
 
-/*
- * smtpSetFrom( smtp, "doe@test.com" )
- * smtpAddTo( smtp, "John Doe <john@test.com>" )
- */
 int smtpSetFrom( Smtp smtp, const char * from );
 int smtpSetReplyTo( Smtp smtp, const char * rto );
 
