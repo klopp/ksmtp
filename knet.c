@@ -27,49 +27,32 @@ int knet_get_ksocket( ksocket sd )
     return sd->sock;
 }
 
-#ifndef __WINDOWS__
-static void _genRandomSeed( void )
+static void _rand_seed( void )
 {
     struct
     {
-//        struct utsname uname;
-//        int uname_1;
-//        int uname_2;
         time_t tt;
         pid_t pid;
+#ifndef __WINDOWS__
         uid_t uid;
         uid_t euid;
         gid_t gid;
         gid_t egid;
+#endif
     } data;
-    /*
-     struct
-     {
-     pid_t pid;
-     time_t time;
-     void *stack;
-     } uniq;
-     */
 
-//    data.uname_1 = uname( &data.uname );
-//    data.uname_2 = errno;
     data.tt = time( 0 );
     data.pid = getpid();
+#ifndef __WINDOWS__
     data.uid = getuid();
     data.euid = geteuid();
     data.gid = getgid();
     data.egid = getegid();
-    RAND_seed( &data, sizeof(data) );
-    /*
-     uniq.pid = getpid();
-     uniq.time = time( NULL );
-     uniq.stack = &uniq;
-     RAND_seed( &uniq, sizeof(uniq) );
-     */
-}
 #endif
+    RAND_seed( &data, sizeof(data) );
+}
 
-int knet_init( int ssl )
+int knet_init(void)
 {
 #if defined(__WINDOWS__)
     WSADATA wsaData;
@@ -83,17 +66,6 @@ int knet_init( int ssl )
         WSACleanup();
         return 0;
     }
-#endif
-    SSL_load_error_strings();
-    if( SSL_library_init() == -1 )
-    {
-#if defined(__WINDOWS__)
-        WSACleanup();
-#endif
-        return 0;
-    }
-#ifndef __WINDOWS__
-    _genRandomSeed();
 #endif
     return 1;
 }
@@ -149,8 +121,14 @@ int knet_connect( ksocket sd, const char * host, int port )
 
 int knet_use_tls( ksocket sd )
 {
+    _rand_seed();
+    SSL_load_error_strings();
+    if( SSL_library_init() == -1 ) return 0;
 #ifndef __WINDOWS__
     sd->ctx = SSL_CTX_new( TLSv1_client_method() );
+#else
+    sd->ctx = SSL_CTX_new (SSLv23_client_method());
+#endif
     if( !sd->ctx ) return 0;
     sd->ssl = SSL_new( sd->ctx );
     if( !sd->ssl )
@@ -160,6 +138,7 @@ int knet_use_tls( ksocket sd )
         return 0;
     }
     SSL_set_fd( sd->ssl, sd->sock );
+    SSL_set_mode( sd->ssl, SSL_MODE_AUTO_RETRY );
     if( SSL_connect( sd->ssl ) == -1 )
     {
         SSL_CTX_free( sd->ctx );
@@ -168,30 +147,6 @@ int knet_use_tls( ksocket sd )
         sd->ctx = NULL;
         return 0;
     }
-#else
-    sd->ctx = SSL_CTX_new (SSLv23_client_method());
-    if(sd->ctx == NULL)
-    {
-        return _0;
-    }
-    sd->ssl = SSL_new (sd->ctx);
-    if(sd->ssl == NULL)
-    {
-        SSL_CTX_free(sd->ctx);
-        sd->ctx = NULL;
-        return 0;
-    }
-    SSL_set_fd (sd->ssl, sd->sock);
-    SSL_set_mode(sd->ssl, SSL_MODE_AUTO_RETRY);
-    if( SSL_connect(sd->ssl) == -1 )
-    {
-        SSL_CTX_free(sd->ctx);
-        SSL_free(sd->ssl);
-        sd->ssl = NULL;
-        sd->ctx = NULL;
-        return 0;
-    }
-#endif /* __WINDOWS__ */
 
     return 1;
 }

@@ -75,7 +75,7 @@ int main( void )
 //    smtpAddFile( smtp, "/home/klopp/tmp/test.png", NULL );
 //    smtpAddFile( smtp, "/home/klopp/tmp/проба.png", NULL );
 
-    if( !knet_init(smtp->tls) )
+    if( !knet_init() )
     {
         printf( "Can not init socket library!\n" );
         return smtpDestroy( smtp, 1 );

@@ -53,7 +53,7 @@ typedef struct _ksocket
     SSL *ssl;
 } *ksocket;
 
-int knet_init( int ssl );
+int knet_init( void );
 void knet_down( void );
 int knet_connect( ksocket sd, const char * host, int port );
 int knet_read( ksocket sd, char *buf, size_t size );
