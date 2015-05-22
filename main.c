@@ -66,7 +66,7 @@ int main( void )
 //    smtpAddHeader( smtp, "X-Custom-Two", "Two" );
 
     smtpEmbedFile( smtp, "/home/klopp/tmp/1.png", NULL );
-//    smtpAttachFile( smtp, "/home/klopp/tmp/test.png", NULL );
+    smtpAttachFile( smtp, "/home/klopp/tmp/test.png", NULL );
 //    smtpAttachFile( smtp, "/home/klopp/tmp/проба.png", NULL );
 
     if( !knet_init() )
