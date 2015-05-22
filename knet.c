@@ -239,7 +239,6 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
     {
         FD_ZERO( &fdwrite );
         FD_ZERO( &fdread );
-
         FD_SET( sd->sock, &fdwrite );
 
         if( write_blocked_on_read )
@@ -437,7 +436,7 @@ int knet_read( ksocket sd, char * buf, size_t sz )
         }
         size_t tomove =
                 sd->inbuf - sd->cursor > left ? left : sd->inbuf - sd->cursor;
-        memmove( buf, sd->buf + sd->cursor, tomove );
+        memcpy( buf, sd->buf + sd->cursor, tomove );
         buf += tomove;
         left -= tomove;
         sd->cursor += tomove;
