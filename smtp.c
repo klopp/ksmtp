@@ -15,30 +15,31 @@ static int smtp_answer( Smtp smtp )
     fd_set fdset;
 
     FD_ZERO( &fdset );
-    FD_SET( smtp->sd->sock, &fdset );
+    FD_SET( smtp->sd.sock, &fdset );
     tv.tv_sec = smtp->timeout;
     tv.tv_usec = 0;
-    select( smtp->sd->sock + 1, &fdset, NULL, NULL, &tv );
-    if( FD_ISSET( smtp->sd->sock, &fdset ) )
+    select( smtp->sd.sock + 1, &fdset, NULL, NULL, &tv );
+    if( FD_ISSET( smtp->sd.sock, &fdset ) )
     {
         char buf[8];
         do
         {
             int c;
             memset( buf, 0, sizeof(buf) );
-            if( !knet_read( smtp->sd, buf, 4 ) )
+            if( !knet_read( &smtp->sd, buf, 4 ) )
             {
                 smtpFormatError( smtp, "smtp_answer(): %s",
-                        knet_error_msg( smtp->sd ) );
+                        knet_error_msg( &smtp->sd ) );
                 return 0;
             }
             scpyc( smtp->current, buf );
-            while( (c = knet_getc( smtp->sd )) != '\n' && !knet_eof( smtp->sd ) )
+            while( (c = knet_getc( &smtp->sd )) != '\n'
+                    && !knet_eof( &smtp->sd ) )
             {
                 if( c == -1 )
                 {
                     smtpFormatError( smtp, "smtp_answer(): %s",
-                            knet_error_msg( smtp->sd ) );
+                            knet_error_msg( &smtp->sd ) );
                     return 0;
                 }
                 else
@@ -49,7 +50,7 @@ static int smtp_answer( Smtp smtp )
 
         } while( buf[3] != ' ' );
 
-        return atoi( buf );
+        return (buf[0] - '0') * 100 + (buf[1] - '0') * 10 + (buf[2] - '0');
     }
     smtpSetError( smtp, "smtp_answer(): TIMEOUT" );
     return 0;
@@ -62,10 +63,10 @@ static int smtp_write( Smtp smtp, const char * buf, size_t size )
     fd_set fdset;
 
     FD_ZERO( &fdset );
-    FD_SET( smtp->sd->sock, &fdset );
+    FD_SET( smtp->sd.sock, &fdset );
     tv.tv_sec = smtp->timeout;
     tv.tv_usec = 0;
-    rc = select( smtp->sd->sock + 1, NULL, &fdset, NULL, &tv );
+    rc = select( smtp->sd.sock + 1, NULL, &fdset, NULL, &tv );
     if( rc == -1 )
     {
         smtpSetError( smtp, "smtp_write(): select error" );
@@ -73,11 +74,11 @@ static int smtp_write( Smtp smtp, const char * buf, size_t size )
     }
     else if( rc )
     {
-        knet_write( smtp->sd, buf, size );
-        if( knet_error( smtp->sd ) )
+        knet_write( &smtp->sd, buf, size );
+        if( knet_error( &smtp->sd ) )
         {
             smtpFormatError( smtp, "smtp_write(): %s",
-                    knet_error_msg( smtp->sd ) );
+                    knet_error_msg( &smtp->sd ) );
             return 0;
         }
     }
@@ -282,8 +283,7 @@ int smtpOpenSession( Smtp smtp )
         return 0;
     }
 
-    smtp->sd = knet_connect( smtp->host, smtp->port );
-    if( smtp->sd == NULL )
+    if( !knet_connect( &smtp->sd, smtp->host, smtp->port ) )
     {
         smtpFormatError( smtp, "Could not connect to %s:%d", smtp->host,
                 smtp->port );
@@ -297,8 +297,8 @@ int smtpOpenSession( Smtp smtp )
 
     if( smtp->tls )
     {
-        if( !smtp_start_tls( smtp ) || !knet_use_tls( smtp->sd )
-                || !knet_verify_sert( smtp->sd ) || !smtp_ehlo( smtp ) )
+        if( !smtp_start_tls( smtp ) || !knet_use_tls( &smtp->sd )
+                || !knet_verify_sert( &smtp->sd ) || !smtp_ehlo( smtp ) )
         {
             smtpFormatError( smtp, "Could not initialize TLS for %s:%d",
                     smtp->host, smtp->port );

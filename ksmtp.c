@@ -79,7 +79,7 @@ Smtp smtpCreate( void )
 
 int smtpDestroy( Smtp smtp, int sig )
 {
-    knet_close( smtp->sd );
+    knet_close( &smtp->sd );
 
     ldestroy( smtp->parts );
     ldestroy( smtp->files );

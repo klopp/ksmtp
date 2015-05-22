@@ -32,33 +32,40 @@ static void _genRandomSeed( void )
 {
     struct
     {
-        struct utsname uname;
-        int uname_1;
-        int uname_2;
+//        struct utsname uname;
+//        int uname_1;
+//        int uname_2;
+        time_t tt;
+        pid_t pid;
         uid_t uid;
         uid_t euid;
         gid_t gid;
         gid_t egid;
     } data;
+    /*
+     struct
+     {
+     pid_t pid;
+     time_t time;
+     void *stack;
+     } uniq;
+     */
 
-    struct
-    {
-        pid_t pid;
-        time_t time;
-        void *stack;
-    } uniq;
-    data.uname_1 = uname( &data.uname );
-    data.uname_2 = errno;
+//    data.uname_1 = uname( &data.uname );
+//    data.uname_2 = errno;
+    data.tt = time( 0 );
+    data.pid = getpid();
     data.uid = getuid();
     data.euid = geteuid();
     data.gid = getgid();
     data.egid = getegid();
     RAND_seed( &data, sizeof(data) );
-
-    uniq.pid = getpid();
-    uniq.time = time( NULL );
-    uniq.stack = &uniq;
-    RAND_seed( &uniq, sizeof(uniq) );
+    /*
+     uniq.pid = getpid();
+     uniq.time = time( NULL );
+     uniq.stack = &uniq;
+     RAND_seed( &uniq, sizeof(uniq) );
+     */
 }
 #endif
 
@@ -110,49 +117,41 @@ int knet_resolve_name( const char *name, struct hostent *hent )
     return 0;
 }
 
-ksocket knet_connect( const char *host, int port )
+int knet_connect( ksocket sd, const char * host, int port )
 {
     struct sockaddr_in sin;
     struct hostent him;
-    ksocket ssd = NULL;
 
     memset( &sin, 0, sizeof(struct sockaddr_in) );
     memset( &him, 0, sizeof(struct hostent) );
 
     if( knet_resolve_name( host, &him ) )
     {
-        int sd;
+        int sock;
         sin.sin_family = PF_INET;
         sin.sin_port = htons( port );
         memcpy( &sin.sin_addr.s_addr, him.h_addr_list[0],
                 sizeof(sin.sin_addr.s_addr) );
-        sd = socket( sin.sin_family, SOCK_STREAM, 0 );
-        if( sd > 0 )
+        sock = socket( sin.sin_family, SOCK_STREAM, 0 );
+        if( sock > 0 )
         {
-            if( connect( sd,(struct sockaddr *)&sin, sizeof(struct sockaddr_in) ) >= 0 )
+            if( connect( sock, (struct sockaddr *)&sin,
+                    sizeof(struct sockaddr_in) ) >= 0 )
             {
-                ssd = calloc( sizeof(struct _ksocket), 1 );
-                ssd->sock = sd;
-                ssd->buf = malloc( MAXSOCKBUF );
-                ssd->bufptr = ssd->buf;
+                sd->sock = sock;
+                sd->bufptr = sd->buf;
+                return 1;
             }
         }
     }
-    return ssd;
+    return 0;
 }
 
 int knet_use_tls( ksocket sd )
 {
-    if( sd->sock <= 0 )
-    {
-        return 0;
-    }
 #ifndef __WINDOWS__
     sd->ctx = SSL_CTX_new( TLSv1_client_method() );
-    if( !sd->ctx )
-    {
-        return 0;
-    }
+    if( !sd->ctx ) return 0;
     sd->ssl = SSL_new( sd->ctx );
     if( !sd->ssl )
     {
@@ -226,11 +225,6 @@ void knet_close( ksocket sd )
                 SSL_CTX_free( sd->ctx );
             }
         }
-        if( sd->buf )
-        {
-            free( sd->buf );
-        }
-        free( sd );
     }
 }
 
@@ -291,34 +285,34 @@ int knet_getc( ksocket sd )
 }
 
 /*
-int knet_putc( ksocket sd, int ch )
-{
-    //int retval = _SUCCESS;
+ int knet_putc( ksocket sd, int ch )
+ {
+ //int retval = _SUCCESS;
 
-    if( !sd->ssl )
-    {
-        if( send( sd->sock, (char *)&ch, 1, 0 ) != 1 )
-        {
-            sd->flags |= _SOCKET_ERROR;
-            sd->error = errno;
-            return 0;
-            //retval = _ERROR;
-        }
-    }
-    else
-    {
-        if( SSL_write( sd->ssl, (char *)&ch, 1 ) == -1 )
-        {
-            sd->flags |= _SOCKET_ERROR;
-            sd->error = errno;
-            return 0;
-            //retval = _ERROR;
-        }
-    }
-    return 1;
-    //return retval;
-}
-*/
+ if( !sd->ssl )
+ {
+ if( send( sd->sock, (char *)&ch, 1, 0 ) != 1 )
+ {
+ sd->flags |= _SOCKET_ERROR;
+ sd->error = errno;
+ return 0;
+ //retval = _ERROR;
+ }
+ }
+ else
+ {
+ if( SSL_write( sd->ssl, (char *)&ch, 1 ) == -1 )
+ {
+ sd->flags |= _SOCKET_ERROR;
+ sd->error = errno;
+ return 0;
+ //retval = _ERROR;
+ }
+ }
+ return 1;
+ //return retval;
+ }
+ */
 
 /*
  int dnet_readln( ksocket sd, dstrbuf *buf )

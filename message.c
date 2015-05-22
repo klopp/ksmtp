@@ -107,6 +107,7 @@ static string makeEmail( Smtp smtp, Addr a )
                 sdel( b64 );
                 return NULL;
             }
+            sdel( b64 );
         }
     }
     else
@@ -406,8 +407,8 @@ static int attachFiles( Smtp smtp, FILE * fout )
             return 0;
         }
 
-        if( !knet_write( smtp->sd, sstr( out ), slen( out ) )
-                || !knet_write( smtp->sd, sstr( b64 ), slen( b64 ) ) )
+        if( !knet_write( &smtp->sd, sstr( out ), slen( out ) )
+                || !knet_write( &smtp->sd, sstr( b64 ), slen( b64 ) ) )
         {
             fclose( f );
             sdel( mime_name );
@@ -454,7 +455,7 @@ int processMessage( Smtp smtp, string msg )
     }
 
     if( !smtp_data( smtp ) ) return 0;
-    if( !knet_write( smtp->sd, sstr( msg ), slen( msg ) ) ) return 0;
+    if( !knet_write( &smtp->sd, sstr( msg ), slen( msg ) ) ) return 0;
 
     if( smtp->files && smtp->files->size )
     {
@@ -463,10 +464,10 @@ int processMessage( Smtp smtp, string msg )
 
     if( smtp->boundary )
     {
-        if( !knet_write( smtp->sd, "\r\n--", sizeof("\r\n--") - 1 )
-                || !knet_write( smtp->sd, smtp->boundary,
+        if( !knet_write( &smtp->sd, "\r\n--", sizeof("\r\n--") - 1 )
+                || !knet_write( &smtp->sd, smtp->boundary,
                         strlen( smtp->boundary ) )
-                || !knet_write( smtp->sd, "--\r\n", sizeof("--\r\n") - 1 ) ) return 0;
+                || !knet_write( &smtp->sd, "--\r\n", sizeof("--\r\n") - 1 ) ) return 0;
     }
 
     return smtp_end_data( smtp );

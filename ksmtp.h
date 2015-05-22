@@ -59,7 +59,7 @@ typedef struct _Smtp
     int port;
     int timeout;
 
-    ksocket sd;
+    struct _ksocket sd;
     string error;
     string current;
     char *boundary;

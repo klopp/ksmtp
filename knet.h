@@ -48,14 +48,14 @@ typedef struct _ksocket
     int error;
     int avail;
     char *bufptr;
-    char *buf;
+    char buf[MAXSOCKBUF];
     SSL_CTX *ctx;
     SSL *ssl;
-}*ksocket;
+} *ksocket;
 
-int knet_init( int tls );
+int knet_init( int ssl );
 void knet_down( void );
-ksocket knet_connect( const char *host, int port );
+int knet_connect( ksocket sd, const char * host, int port );
 int knet_read( ksocket sd, char *buf, size_t size );
 int knet_write( ksocket sd, const char *buf, size_t size );
 int knet_getc( ksocket sd );

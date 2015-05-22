@@ -10,6 +10,7 @@
 
 int main( void )
 {
+/*
     char html[] =
             "<html>"
                     "<head><title>title</title></head>\n"
@@ -21,26 +22,40 @@ int main( void )
                     "<h4>h4</h4>\n"
                     //"<img src=\"test.png\" />\n"
                     "</body></html>";
+*/
 
     Smtp smtp = smtpCreate();
 
+
 /*
-     #define USER        "vsevolod.lutovinov@ibic.se"
-     #define PASSWORD    "0UnrsZvNYGby"
-     #define HOST        "mail.ibic.se"
-     #define TO          "Zazaza <klopp@yandex.ru>"
+#define USER        "vsevolod.lutovinov@ibic.se"
+#define PASSWORD    "0UnrsZvNYGby"
+#define HOST        "mail.ibic.se"
+#define TO          "Zazaza <klopp@yandex.ru>"
+#define PORT        2525
 */
+
 
 #define USER        "klopp@yandex.ru"
 #define PASSWORD    "easypass123"
 #define HOST        "smtp.yandex.com"
 #define TO          "vsevolod.lutovinov@ibic.se" // "Zazaza <klopp.spb@gmail.com>"
+#define PORT        25
+
+/*
+#define USER        "kloppsob@bk.ru"
+#define PASSWORD    "vla212850a"
+#define HOST        "smtp.mail.ru"
+#define TO          "vsevolod.lutovinov@ibic.se" // "Zazaza <klopp.spb@gmail.com>"
+#define PORT        25
+*/
+
 
     smtp->tls = 1;
     smtpSetFrom( smtp, "Бумбастик <"USER">" );
 
     smtpSetAuth( smtp, AUTH_LOGIN );
-    smtpSetSMTP( smtp, HOST, 25 );
+    smtpSetSMTP( smtp, HOST, PORT );
     smtpSetLogin( smtp, USER );
     smtpSetPassword( smtp, PASSWORD );
     smtpSetLogin( smtp, USER );
@@ -51,16 +66,16 @@ int main( void )
     //smtpSetSubject( smtp, "А вот как насчёт?" );
 
 //    smtpAddUtfTextPart( smtp, "ляляля", "plain" );
-    //    smtpAddUtfTextPart( smtp, "кукукук", "html" );
-    smtpAddTextPart( smtp, html, "html", "us-ascii" );
+      smtpAddUtfTextPart( smtp, "кукукук", "html" );
+//    smtpAddTextPart( smtp, html, "html", "us-ascii" );
 
-    smtpAddHeader( smtp, "X-Custom-One", "One" );
+//    smtpAddHeader( smtp, "X-Custom-One", "One" );
 //    smtpAddHeader( smtp, "X-Custom-Two", "Two" );
 
-    smtpAddFile( smtp, "/home/klopp/tmp/test.png", NULL );
+//    smtpAddFile( smtp, "/home/klopp/tmp/test.png", NULL );
 //    smtpAddFile( smtp, "/home/klopp/tmp/проба.png", NULL );
 
-    if( !knet_init( smtp->tls ) )
+    if( !knet_init(smtp->tls) )
     {
         printf( "Can not init socket library!\n" );
         return smtpDestroy( smtp, 1 );
