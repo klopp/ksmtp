@@ -67,7 +67,6 @@ typedef struct _Smtp
     KsmtpFlags flags;
 
     int port;
-    int timeout;
 
     struct _ksocket sd;
     string error;

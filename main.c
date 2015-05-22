@@ -21,7 +21,7 @@ int main( void )
             //"<img src=\"test.png\" />\n"
             "</body></html>";
 
-    Smtp smtp = smtpCreate( KSMTP_USE_TLS | KSMTP_DEBUG );
+    Smtp smtp = smtpCreate( /*KSMTP_USE_TLS | */KSMTP_DEBUG );
 
      #define USER        "vsevolod.lutovinov@ibic.se"
      #define PASSWORD    "0UnrsZvNYGby"

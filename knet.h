@@ -42,12 +42,13 @@ enum
 
 typedef struct _ksocket
 {
+    int timeout;
     int eom;
     int sock;
     int flags;
     int error;
-    int avail;
-    char *bufptr;
+    int inbuf;
+    int cursor;
     char buf[SOCK_BUF_LEN];
     SSL_CTX *ctx;
     SSL *ssl;

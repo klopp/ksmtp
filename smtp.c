@@ -11,49 +11,35 @@
 
 static int smtp_answer( Smtp smtp )
 {
-    struct timeval tv;
-    fd_set fdset;
-
-    FD_ZERO( &fdset );
-    FD_SET( smtp->sd.sock, &fdset );
-    tv.tv_sec = smtp->timeout;
-    tv.tv_usec = 0;
-    select( smtp->sd.sock + 1, &fdset, NULL, NULL, &tv );
-    if( FD_ISSET( smtp->sd.sock, &fdset ) )
+    char buf[8];
+    do
     {
-        char buf[8];
-        do
+        int c;
+        memset( buf, 0, sizeof(buf) );
+        if( !knet_read( &smtp->sd, buf, 4 ) )
         {
-            int c;
-            memset( buf, 0, sizeof(buf) );
-            if( !knet_read( &smtp->sd, buf, 4 ) )
+            smtpFormatError( smtp, "smtp_answer(): %s",
+                    knet_error_msg( &smtp->sd ) );
+            return 0;
+        }
+        scpyc( smtp->current, buf );
+        while( (c = knet_getc( &smtp->sd )) != '\n' && !knet_eof( &smtp->sd ) )
+        {
+            if( c == -1 )
             {
                 smtpFormatError( smtp, "smtp_answer(): %s",
                         knet_error_msg( &smtp->sd ) );
                 return 0;
             }
-            scpyc( smtp->current, buf );
-            while( (c = knet_getc( &smtp->sd )) != '\n'
-                    && !knet_eof( &smtp->sd ) )
+            else
             {
-                if( c == -1 )
-                {
-                    smtpFormatError( smtp, "smtp_answer(): %s",
-                            knet_error_msg( &smtp->sd ) );
-                    return 0;
-                }
-                else
-                {
-                    scatch( smtp->current, c );
-                }
+                scatch( smtp->current, c );
             }
+        }
 
-        } while( buf[3] != ' ' );
+    } while( buf[3] != ' ' );
 
-        return (buf[0] - '0') * 100 + (buf[1] - '0') * 10 + (buf[2] - '0');
-    }
-    smtpSetError( smtp, "smtp_answer(): TIMEOUT" );
-    return 0;
+    return (buf[0] - '0') * 100 + (buf[1] - '0') * 10 + (buf[2] - '0');
 }
 
 static int smtp_write( Smtp smtp, const char * buf, size_t size )
@@ -64,7 +50,7 @@ static int smtp_write( Smtp smtp, const char * buf, size_t size )
 
     FD_ZERO( &fdset );
     FD_SET( smtp->sd.sock, &fdset );
-    tv.tv_sec = smtp->timeout;
+    tv.tv_sec = smtp->sd.timeout;
     tv.tv_usec = 0;
     rc = select( smtp->sd.sock + 1, NULL, &fdset, NULL, &tv );
     if( rc == -1 )
@@ -299,10 +285,7 @@ int smtpOpenSession( Smtp smtp )
         return 0;
     }
 
-    if( !smtpInit( smtp ) )
-    {
-        return 0;
-    }
+    if( !smtpInit( smtp ) ) return 0;
 
     if( smtp->flags & KSMTP_USE_TLS )
     {

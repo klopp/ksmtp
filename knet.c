@@ -111,7 +111,6 @@ int knet_connect( ksocket sd, const char * host, int port )
                     sizeof(struct sockaddr_in) ) >= 0 )
             {
                 sd->sock = sock;
-                sd->bufptr = sd->buf;
                 return 1;
             }
         }
@@ -179,115 +178,6 @@ void knet_close( ksocket sd )
     }
 }
 
-int knet_getc( ksocket sd )
-{
-    int retval = 1;
-
-    if( sd->avail <= 0 )
-    {
-        int recval = 0;
-        sd->eom = 0;
-        sd->flags = 0;
-        memset( sd->buf, 0, SOCK_BUF_LEN );
-        if( !sd->ssl )
-        {
-            recval = recv( sd->sock, sd->buf, SOCK_BUF_LEN, 0 );
-        }
-        else
-        {
-            recval = SSL_read( sd->ssl, sd->buf, SOCK_BUF_LEN );
-        }
-        if( recval == 0 )
-        {
-            sd->flags |= _SOCKET_EOF;
-            retval = -1;
-        }
-        else if( recval == -1 )
-        {
-            sd->flags |= _SOCKET_ERROR;
-            sd->error = errno;
-            retval = -1;
-        }
-        else
-        {
-            sd->bufptr = sd->buf;
-            sd->avail = recval;
-            if( recval < SOCK_BUF_LEN )
-            {
-                sd->eom = 1;
-            }
-            else
-            {
-                sd->eom = 0;
-            }
-        }
-    }
-
-    if( sd->avail > 0 )
-    {
-        sd->avail--;
-        if( sd->avail == 0 && sd->eom )
-        {
-            sd->flags |= _SOCKET_EOF;
-        }
-        retval = *sd->bufptr++;
-    }
-    return retval;
-}
-
-/*
- int knet_putc( ksocket sd, int ch )
- {
- //int retval = _SUCCESS;
-
- if( !sd->ssl )
- {
- if( send( sd->sock, (char *)&ch, 1, 0 ) != 1 )
- {
- sd->flags |= _SOCKET_ERROR;
- sd->error = errno;
- return 0;
- //retval = _ERROR;
- }
- }
- else
- {
- if( SSL_write( sd->ssl, (char *)&ch, 1 ) == -1 )
- {
- sd->flags |= _SOCKET_ERROR;
- sd->error = errno;
- return 0;
- //retval = _ERROR;
- }
- }
- return 1;
- //return retval;
- }
- */
-
-/*
- int dnet_readln( ksocket sd, dstrbuf *buf )
- {
- int ch, size = 0;
-
- do
- {
- ch = knet_getc( sd );
- if( ch == -1 )
- {
- // Error
- break;
- }
- else
- {
- dsbCatChar( buf, ch );
- size++;
- }
- } while( ch != '\n' && !knet_eof( sd ) );
- return size;
- }
- */
-
 int knet_write( ksocket sd, const char *buf, size_t len )
 {
     size_t sent = 0;
@@ -333,28 +223,88 @@ int knet_write( ksocket sd, const char *buf, size_t len )
     {
         sent = SSL_write( sd->ssl, buf, len );
     }
-
     return sent;
 }
 
-int knet_read( ksocket sd, char *buf, size_t size )
+static int _knet_read_ssl( ksocket sd )
 {
-    size_t i;
+    return SSL_read( sd->ssl, sd->buf, SOCK_BUF_LEN );
+}
 
-    for( i = 0; i < size; i++ )
+static int _knet_read_socket( ksocket sd )
+{
+    int rc = -1;
+    fd_set fdread;
+    struct timeval timeout;
+
+    timeout.tv_sec = sd->timeout;
+    timeout.tv_usec = 0;
+
+    FD_ZERO( &fdread );
+    FD_SET( sd->sock, &fdread );
+
+    if( (rc = select( sd->sock + 1, &fdread, NULL, NULL, &timeout )) < 0 ) return -1;
+
+    if( FD_ISSET( sd->sock, &fdread ) )
     {
-        int ch = knet_getc( sd );
-        if( ch == -1 )
-        {
-            i = 0;
-            break;
-        }
-        *buf++ = ch;
-        if( knet_eof( sd ) )
-        {
-            break;
-        }
+        rc = recv( sd->sock, sd->buf, SOCK_BUF_LEN, 0 );
     }
-    return i;
+    return rc;
+}
+
+static int _knet_getbuf( ksocket sd )
+{
+    int rc;
+    sd->eom = 0;
+    sd->flags = 0;
+    sd->inbuf = sd->cursor = 0;
+    memset( sd->buf, 0, SOCK_BUF_LEN );
+    rc = sd->ssl ? _knet_read_ssl( sd ) : _knet_read_socket( sd );
+    if( rc == 0 )
+    {
+        sd->flags |= _SOCKET_EOF;
+        return -1;
+    }
+    else if( rc == -1 )
+    {
+        sd->flags |= _SOCKET_ERROR;
+        sd->error = errno;
+        return -1;
+    }
+    sd->inbuf = rc;
+    if( rc < SOCK_BUF_LEN )
+    {
+        sd->eom = 1;
+    }
+    else
+    {
+        sd->eom = 0;
+    }
+    return rc;
+}
+
+int knet_read( ksocket sd, char * buf, size_t sz )
+{
+    size_t left = sz;
+    while( left )
+    {
+        if( sd->cursor >= sd->inbuf )
+        {
+            if( _knet_getbuf( sd ) == -1 ) return 0;
+        }
+        size_t tomove =
+                sd->inbuf - sd->cursor > left ? left : sd->inbuf - sd->cursor;
+        memmove( buf, sd->buf + sd->cursor, tomove );
+        buf += tomove;
+        left -= tomove;
+        sd->cursor += tomove;
+    }
+    return left ? 0 : sz;
+}
+
+int knet_getc( ksocket sd )
+{
+    char c;
+    return knet_read( sd, &c, 1 ) ? ((int)c & 0xFF) : -1;
 }
 

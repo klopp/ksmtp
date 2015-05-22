@@ -57,7 +57,7 @@ Smtp smtpCreate( KsmtpFlags flags )
 
     smtp->flags = flags;
     smtp->port = 25;
-    smtp->timeout = 10;
+    smtp->sd.timeout = 10;
     if( gethostname( smtp->nodename, sizeof(smtp->nodename) - 1 ) < 0 )
     {
         strcpy( smtp->nodename, "localhost" );
@@ -446,7 +446,7 @@ int smtpSetTimeout( Smtp smtp, int timeout )
 {
     if( timeout > 0 && timeout < INT_MAX )
     {
-        smtp->timeout = timeout;
+        smtp->sd.timeout = timeout;
         return 1;
     }
     return 0;
