@@ -58,6 +58,7 @@ Smtp smtpCreate( KsmtpFlags flags )
     smtp->flags = flags;
     smtp->port = 25;
     smtp->sd.timeout = 10;
+    smtp->sd.sock = -1;
     if( gethostname( smtp->nodename, sizeof(smtp->nodename) - 1 ) < 0 )
     {
         strcpy( smtp->nodename, "localhost" );

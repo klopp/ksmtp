@@ -22,11 +22,6 @@ char * knet_error_msg( ksocket sd )
     return strerror( sd->error );
 }
 
-int knet_get_ksocket( ksocket sd )
-{
-    return sd->sock;
-}
-
 static void _rand_seed( void )
 {
     struct
@@ -77,43 +72,30 @@ void knet_down( void )
 #endif
 }
 
-int knet_resolve_name( const char *name, struct hostent *hent )
-{
-    struct hostent *him;
-    him = gethostbyname( name );
-    if( him )
-    {
-        memcpy( hent, him, sizeof(struct hostent) );
-        return 1;
-    }
-    return 0;
-}
-
 int knet_connect( ksocket sd, const char * host, int port )
 {
-    struct sockaddr_in sin;
-    struct hostent him;
+    struct sockaddr_in sa;
+    struct hostent * he = gethostbyname( host );
+    if( !he ) return 1;
 
-    memset( &sin, 0, sizeof(struct sockaddr_in) );
-    memset( &him, 0, sizeof(struct hostent) );
-
-    if( knet_resolve_name( host, &him ) )
+    memset( &sa, 0, sizeof(sa) );
+    sa.sin_family = PF_INET;
+    sa.sin_port = htons( port );
+    memcpy( &sa.sin_addr.s_addr, he->h_addr_list[0],
+            sizeof(sa.sin_addr.s_addr) );
+    sd->sock = socket( sa.sin_family, SOCK_STREAM, 0 );
+    if( sd->sock > 0 )
     {
-        int sock;
-        sin.sin_family = PF_INET;
-        sin.sin_port = htons( port );
-        memcpy( &sin.sin_addr.s_addr, him.h_addr_list[0],
-                sizeof(sin.sin_addr.s_addr) );
-        sock = socket( sin.sin_family, SOCK_STREAM, 0 );
-        if( sock > 0 )
+        if( connect( sd->sock, (struct sockaddr *)&sa, sizeof(sa) ) >= 0 )
         {
-            if( connect( sock, (struct sockaddr *)&sin,
-                    sizeof(struct sockaddr_in) ) >= 0 )
-            {
-                sd->sock = sock;
-                return 1;
-            }
+            return 1;
         }
+#if defined(_MSC_VER)
+        closeksocket( sd->sock );
+#else
+        close( sd->sock );
+#endif
+        sd->sock = -1;
     }
     return 0;
 }
@@ -159,22 +141,19 @@ int knet_verify_sert( ksocket sd )
 
 void knet_close( ksocket sd )
 {
-    if( sd )
+    if( sd->sock >= 0 )
     {
-        if( sd->sock )
-        {
 #if defined(_MSC_VER)
-            closeksocket( sd->sock );
+        closeksocket( sd->sock );
 #else
-            close( sd->sock );
+        close( sd->sock );
 #endif
-        }
-        if( sd->ssl )
-        {
-            SSL_shutdown( sd->ssl );
-            SSL_free( sd->ssl );
-            if( sd->ctx ) SSL_CTX_free( sd->ctx );
-        }
+    }
+    if( sd->ssl )
+    {
+        SSL_shutdown( sd->ssl );
+        SSL_free( sd->ssl );
+        if( sd->ctx ) SSL_CTX_free( sd->ctx );
     }
 }
 
