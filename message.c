@@ -252,13 +252,13 @@ static int createHeaders( Smtp smtp, string msg )
 
     if( !scatc( msg, "Mime-Version: 1.0\r\n" ) ) return 0;
 
-    if( smtp->afiles && smtp->afiles->size )
+    if( smtp->afiles->size )
     {
-        // TODO related handling
+        // TODO multipart/related handling if efiles not empty
         if( !scatc( msg, "Content-Type: multipart/mixed; boundary=\"" )
                 || !scatc( msg, smtp->boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
     }
-    else if( smtp->parts && smtp->parts->size > 1 )
+    else if( smtp->parts->size > 1 )
     {
         if( !scatc( msg, "Content-Type: multipart/alternative; boundary=\"" )
                 || !scatc( msg, smtp->boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
@@ -278,7 +278,7 @@ static int makeMessage( Smtp smtp, string msg )
     char * boundary = smtp->boundary;
 
     part = (TextPart)lfirst( smtp->parts );
-    if( smtp->parts->size > 1 && smtp->afiles && smtp->afiles->size )
+    if( smtp->parts->size > 1 && smtp->afiles->size )
     {
         boundary = mimeMakeBoundary();
         if( !boundary ) return 0;
@@ -290,7 +290,7 @@ static int makeMessage( Smtp smtp, string msg )
 
     while( part )
     {
-        if( smtp->parts->size > 1 || (smtp->afiles && smtp->afiles->size) )
+        if( smtp->parts->size > 1 || smtp->afiles->size )
         {
             if( !scatc( msg, "\r\n--" ) || !scatc( msg, boundary )
                     || !scatc( msg, "\r\n" )
@@ -457,7 +457,7 @@ int processMessage( Smtp smtp, string msg )
     if( !smtp_data( smtp ) ) return 0;
     if( !knet_write( &smtp->sd, sstr( msg ), slen( msg ) ) ) return 0;
 
-    if( smtp->afiles && smtp->afiles->size )
+    if( smtp->afiles->size )
     {
         if( !attachFiles( smtp, NULL ) ) return 0;
     }
@@ -477,8 +477,7 @@ string createMessage( Smtp smtp )
 {
     string msg = snew();
 
-    if( (smtp->afiles && smtp->afiles->size)
-            || (smtp->parts && smtp->parts->size > 1) )
+    if( (smtp->afiles->size) || smtp->parts->size > 1 )
     {
         smtp->boundary = mimeMakeBoundary();
         if( !smtp->boundary )
@@ -494,7 +493,7 @@ string createMessage( Smtp smtp )
         return NULL;
     }
 
-    if( smtp->parts && smtp->parts->size && !makeMessage( smtp, msg ) )
+    if( smtp->parts->size && !makeMessage( smtp, msg ) )
     {
         sdel( msg );
         return NULL;
