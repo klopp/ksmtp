@@ -54,7 +54,7 @@ typedef struct _TextPart
     char * body;
     char * ctype;
     char charset[32];
-    char cprefix[32];
+    char cprefix[40];
 }*TextPart;
 
 typedef enum _KsmtpFlags
@@ -72,14 +72,13 @@ typedef struct _Smtp
     struct _ksocket sd;
     string error;
     string current;
-    /*char *boundary;*/
 #ifndef __WINDOWS__
     char nodename[HOST_NAME_MAX + 1];
 #else
     char nodename[ PATH_MAX + 1 ];
 #endif
     char charset[32];
-    char cprefix[42];
+    char cprefix[40];
     char *subject;
     char *xmailer;
     char *smtp_user;
