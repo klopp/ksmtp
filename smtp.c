@@ -44,33 +44,11 @@ static int smtp_answer( Smtp smtp )
 
 static int smtp_write( Smtp smtp, const char * buf, size_t size )
 {
-    int rc = 0;
-    struct timeval tv;
-    fd_set fdset;
-
-    FD_ZERO( &fdset );
-    FD_SET( smtp->sd.sock, &fdset );
-    tv.tv_sec = smtp->sd.timeout;
-    tv.tv_usec = 0;
-    rc = select( smtp->sd.sock + 1, NULL, &fdset, NULL, &tv );
-    if( rc == -1 )
+    knet_write( &smtp->sd, buf, size );
+    if( knet_error( &smtp->sd ) )
     {
-        smtpSetError( smtp, "smtp_write(): select error" );
-        return 0;
-    }
-    else if( rc )
-    {
-        knet_write( &smtp->sd, buf, size );
-        if( knet_error( &smtp->sd ) )
-        {
-            smtpFormatError( smtp, "smtp_write(): %s",
-                    knet_error_msg( &smtp->sd ) );
-            return 0;
-        }
-    }
-    else
-    {
-        smtpSetError( smtp, "smtp_write(): TIMEOUT" );
+        smtpFormatError( smtp, "smtp_write(): %s",
+                knet_error_msg( &smtp->sd ) );
         return 0;
     }
     return 1;
