@@ -105,22 +105,20 @@ int smtpDestroy( Smtp smtp, int sig )
     sdel( smtp->error );
     sdel( smtp->current );
 
-    free( smtp->boundary );
+    /*free( smtp->boundary );*/
     free( smtp->subject );
     free( smtp->xmailer );
     free( smtp->host );
     free( smtp->smtp_user );
     free( smtp->smtp_password );
 
-    /*
-     TT_destroy( smtp->mime_types );
-     TT_destroy( smtp->us_ascii );
-     */
-
     free( smtp );
     return sig;
 }
 
+/*
+ * TODO check if part with ctype (and/or charset?) exists?
+ */
 int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype,
         const char * charset )
 {
@@ -287,7 +285,7 @@ const char * smtpEmbedFile( Smtp smtp, const char * name, const char * ctype )
     }
     smtp->lastid++;
     sprintf( file->cid, "%s%d", KFILE_CONTENT_ID, smtp->lastid );
-    if( !ladd( smtp->afiles, file ) )
+    if( !ladd( smtp->efiles, file ) )
     {
         delEFile( file );
         return NULL;

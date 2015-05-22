@@ -245,12 +245,10 @@ void smtpCloseSession( Smtp smtp )
 int smtpSendMail( Smtp smtp )
 {
     int rc = 0;
-    string msg = createMessage( smtp );
-    if( msg )
-    {
-        rc = processMessage( smtp, msg );
-    }
-    sdel( msg );
+    string headers = createHeaders( smtp );
+    if( !headers ) return 0;
+    rc = processMessage( smtp, headers );
+    sdel( headers );
     return rc;
 }
 
@@ -276,6 +274,17 @@ int smtpOpenSession( Smtp smtp )
         smtpSetError( smtp, "No From: address!" );
         return 0;
     }
+    if( !smtp->parts->size && !smtp->afiles->size )
+    {
+        smtpSetError( smtp, "No text parts and attached files!" );
+        return 0;
+    }
+    if( !smtp->parts->size && smtp->efiles->size )
+    {
+        smtpSetError( smtp, "Embedded filed detected, but no text parts!" );
+        return 0;
+    }
+
     if( smtp->smtp_auth
             && (smtp->smtp_auth != AUTH_PLAIN && smtp->smtp_auth != AUTH_LOGIN) )
     {

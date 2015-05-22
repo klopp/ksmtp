@@ -44,7 +44,8 @@ string mimeFileName( const char * name, const char * charset )
         {
             filename = snew();
             if( !filename
-                    || !sprint( filename, "=?%s?B?%s?=", charset, sstr( b64 ) ) )
+                    || !sprint( filename, "=?%s?B?%s?=", charset,
+                            sstr( b64 ) ) )
             {
                 sdel( b64 );
                 sdel( filename );
@@ -56,10 +57,13 @@ string mimeFileName( const char * name, const char * charset )
     return filename;
 }
 
-char * mimeMakeBoundary( void )
+char * mimeMakeBoundary( char * boundary )
 {
-    char * boundary = calloc( 33, 1 );
-    if( !boundary ) return NULL;
+    if( !boundary )
+    {
+        boundary = calloc( 33, 1 );
+        if( !boundary ) return NULL;
+    }
 
     strcpy( boundary, "=-" );
     rnd_string( boundary + 2, 30 );

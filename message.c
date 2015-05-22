@@ -121,39 +121,87 @@ static string makeEmail( Smtp smtp, Addr a )
     return buf;
 }
 
-static int makePartContentType( Smtp smtp, TextPart part, string msg )
+static string makeTextParts( Smtp smtp )
 {
-    string ct = snew();
-    if( !ct ) return 0;
+    TextPart part = lfirst( smtp->parts );
+    char boundary[36];
+    int rc = 1;
+    string parts = snew();
+    if( !parts ) return NULL;
 
-    if( *part->cprefix )
+    if( smtp->parts->size > 1 )
     {
-        if( !sprint( ct, "Content-Type: text/%s; charset=%s\r\n"
-                "Content-Disposition: inline\r\n"
-                "Content-Transfer-Encoding: base64\r\n", part->ctype,
-                part->charset ) )
+        mimeMakeBoundary( boundary );
+        if( !scpyc( parts, "Content-Type: multipart/alternative; boundary=\"" )
+                || !scatc( parts, boundary ) || !scatc( parts, "\"\r\n\r\n" ) )
         {
-            sdel( ct );
-            return 0;
+            sdel( parts );
+            return NULL;
         }
     }
-    else
+
+    while( part )
     {
-        if( !sprint( ct, "Content-Type: text/%s; charset=%s\r\n", part->ctype,
-                part->charset ) )
+        if( smtp->parts->size > 1 )
         {
-            sdel( ct );
-            return 0;
+            if( !scatc( parts, "--" ) || !scatc( parts, boundary )
+                    || !scatc( parts, "\r\nContent-ID: text@part\r\n" ) )
+            {
+                rc = 0;
+                break;
+            }
+        }
+        if( *part->cprefix )
+        {
+            string b64 = base64_sencode( part->body );
+            if( !b64 || !scatc( parts, "Content-Type: text/" )
+                    || !scatc( parts, part->ctype )
+                    || !scatc( parts, "; charset=" )
+                    || !scatc( parts, part->charset )
+                    || !scatc( parts, "\r\nContent-Disposition: inline\r\n"
+                            "Content-Transfer-Encoding: base64\r\n\r\n" )
+                    || !scatc( parts, sstr( b64 ) )
+                    || !scatc( parts, "\r\n\r\n" ) )
+            {
+                sdel( b64 );
+                rc = 0;
+                break;
+            }
+            sdel( b64 );
+        }
+        else
+        {
+            if( !scatc( parts, "Content-Type: text/" )
+                    || !scatc( parts, part->ctype )
+                    || !scatc( parts, "; charset=" )
+                    || !scatc( parts, part->charset )
+                    || !scatc( parts, "\r\n\r\n" )
+                    || !scatc( parts, part->body )
+                    || !scatc( parts, "\r\n\r\n" ) )
+            {
+                rc = 0;
+                break;
+            }
+        }
+        part = lnext( smtp->parts );
+    }
+    if( rc )
+    {
+        if( smtp->parts->size > 1 )
+        {
+            if( !scatc( parts, "--" ) || !scatc( parts, boundary )
+                    || !scatc( parts, "--\r\n" ) )
+            {
+                rc = 0;
+            }
         }
     }
-    if( !scat( msg, ct ) )
+    if( !rc )
     {
-        sdel( ct );
-        return 0;
+        sdel( parts );
+        return NULL;
     }
-    sdel( ct );
-    return 1;
-
+    return parts;
 }
 
 static int makeOneAddr( Smtp smtp, const char * title, Addr a, string out )
@@ -236,268 +284,454 @@ static int makeExtraHeaders( Smtp smtp, string msg )
     return 1;
 }
 
-static int createHeaders( Smtp smtp, string msg )
+string createHeaders( Smtp smtp )
 {
-    if( !makeEncodedHeader( smtp, "Subject", smtp->subject, msg ) ) return 0;
+    string headers = snew();
 
-    if( !makeOneAddr( smtp, "From", smtp->from, msg ) ) return 0;
-    if( !makeOneAddr( smtp, "Reply-To", smtp->replyto, msg ) ) return 0;
-
-    if( !makeAddrList( smtp, "To", smtp->to, msg ) ) return 0;
-    if( !makeAddrList( smtp, "Cc", smtp->cc, msg ) ) return 0;
-    if( !makeAddrList( smtp, "Bcc", smtp->bcc, msg ) ) return 0;
-
-    if( !makeDateHeader( msg ) ) return 0;
-    if( !makeExtraHeaders( smtp, msg ) ) return 0;
-
-    if( !scatc( msg, "Mime-Version: 1.0\r\n" ) ) return 0;
-
-    if( smtp->afiles->size )
+    if( !headers
+            || !makeEncodedHeader( smtp, "Subject", smtp->subject, headers )
+            || !makeOneAddr( smtp, "From", smtp->from, headers )
+            || !makeOneAddr( smtp, "Reply-To", smtp->replyto, headers )
+            || !makeAddrList( smtp, "To", smtp->to, headers )
+            || !makeAddrList( smtp, "Cc", smtp->cc, headers )
+            || !makeAddrList( smtp, "Bcc", smtp->bcc, headers )
+            || !makeDateHeader( headers )
+            || !makeExtraHeaders( smtp, headers ) )
     {
-        // TODO multipart/related handling if efiles not empty
-        if( !scatc( msg, "Content-Type: multipart/mixed; boundary=\"" )
-                || !scatc( msg, smtp->boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
+        sdel( headers );
+        return NULL;
     }
-    else if( smtp->parts->size > 1 )
-    {
-        if( !scatc( msg, "Content-Type: multipart/alternative; boundary=\"" )
-                || !scatc( msg, smtp->boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
-    }
-    else
-    {
-        TextPart part = (TextPart)lfirst( smtp->parts );
-        if( part && !makePartContentType( smtp, part, msg ) ) return 0;
-    }
+    return headers;
 
-    return scatc( msg, "\r\n" ) != NULL;
+    /*
+     if( !scatc( msg, "Mime-Version: 1.0\r\n" ) ) return 0;
+
+     if( smtp->afiles->size )
+     {
+     if( !scatc( msg, "Content-Type: multipart/mixed; boundary=\"" )
+     || !scatc( msg, smtp->boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
+     }
+     else if( smtp->parts->size > 1 )
+     {
+     if( !scatc( msg, "Content-Type: multipart/alternative; boundary=\"" )
+     || !scatc( msg, smtp->boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
+     }
+     else
+     {
+     TextPart part = (TextPart)lfirst( smtp->parts );
+     if( part && !makePartContentType( smtp, part, msg ) ) return 0;
+     }
+
+     return scatc( msg, "\r\n" ) != NULL;
+     */
 }
 
-static int makeMessage( Smtp smtp, string msg )
+/*
+ static int makeMessage( Smtp smtp, string msg )
+ {
+ TextPart part;
+ char * boundary = smtp->boundary;
+
+ part = (TextPart)lfirst( smtp->parts );
+ if( smtp->parts->size > 1 && smtp->afiles->size )
+ {
+ boundary = mimeMakeBoundary();
+ if( !boundary ) return 0;
+ if( !scatc( msg, "--" ) || !scatc( msg, smtp->boundary )
+ || !scatc( msg,
+ "\r\nContent-Type: multipart/alternative; boundary=\"" )
+ || !scatc( msg, boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
+ }
+
+ while( part )
+ {
+ if( smtp->parts->size > 1 || smtp->afiles->size )
+ {
+ if( !scatc( msg, "\r\n--" ) || !scatc( msg, boundary )
+ || !scatc( msg, "\r\n" )
+ || !makePartContentType( smtp, part, msg )
+ || !scatc( msg, "Content-ID: 1\r\n\r\n" ) )
+ {
+ if( boundary != smtp->boundary ) free( boundary );
+ return 0;
+ }
+ }
+ if( *part->cprefix )
+ {
+ string b64 = base64_sencode( part->body );
+ if( !b64 )
+ {
+ if( boundary != smtp->boundary ) free( boundary );
+ return 0;
+ }
+ if( !scat( msg, b64 ) )
+ {
+ sdel( b64 );
+ if( boundary != smtp->boundary ) free( boundary );
+ return 0;
+ }
+ sdel( b64 );
+ }
+ else
+ {
+ if( !scatc( msg, part->body ) )
+ {
+ if( boundary != smtp->boundary ) free( boundary );
+ return 0;
+ }
+ }
+ if( !scatc( msg, "\r\n" ) )
+ {
+ if( boundary != smtp->boundary ) free( boundary );
+ return 0;
+ }
+ part = (TextPart)lnext( smtp->parts );
+ }
+
+ if( boundary != smtp->boundary )
+ {
+ if( !scatc( msg, "\r\n--" ) || !scatc( msg, boundary )
+ || !scatc( msg, "--\r\n" ) )
+ {
+ free( boundary );
+ return 0;
+ }
+ else
+ {
+ free( boundary );
+ }
+ }
+ return 1;
+ }
+ */
+
+static int ksmtp_write( Smtp smtp, const char * buf, size_t len, FILE * log )
 {
-    TextPart part;
-    char * boundary = smtp->boundary;
-
-    part = (TextPart)lfirst( smtp->parts );
-    if( smtp->parts->size > 1 && smtp->afiles->size )
+    if( log )
     {
-        boundary = mimeMakeBoundary();
-        if( !boundary ) return 0;
-        if( !scatc( msg, "--" ) || !scatc( msg, smtp->boundary )
-                || !scatc( msg,
-                        "\r\nContent-Type: multipart/alternative; boundary=\"" )
-                || !scatc( msg, boundary ) || !scatc( msg, "\"\r\n" ) ) return 0;
+        fwrite( buf, len, 1, log );
     }
-
-    while( part )
-    {
-        if( smtp->parts->size > 1 || smtp->afiles->size )
-        {
-            if( !scatc( msg, "\r\n--" ) || !scatc( msg, boundary )
-                    || !scatc( msg, "\r\n" )
-                    || !makePartContentType( smtp, part, msg )
-                    || !scatc( msg, "Content-ID: 1\r\n\r\n" ) )
-            {
-                if( boundary != smtp->boundary ) free( boundary );
-                return 0;
-            }
-        }
-        if( *part->cprefix )
-        {
-            string b64 = base64_sencode( part->body );
-            if( !b64 )
-            {
-                if( boundary != smtp->boundary ) free( boundary );
-                return 0;
-            }
-            if( !scat( msg, b64 ) )
-            {
-                sdel( b64 );
-                if( boundary != smtp->boundary ) free( boundary );
-                return 0;
-            }
-            sdel( b64 );
-        }
-        else
-        {
-            if( !scatc( msg, part->body ) )
-            {
-                if( boundary != smtp->boundary ) free( boundary );
-                return 0;
-            }
-        }
-        if( !scatc( msg, "\r\n" ) )
-        {
-            if( boundary != smtp->boundary ) free( boundary );
-            return 0;
-        }
-        part = (TextPart)lnext( smtp->parts );
-    }
-
-    if( boundary != smtp->boundary )
-    {
-        if( !scatc( msg, "\r\n--" ) || !scatc( msg, boundary )
-                || !scatc( msg, "--\r\n" ) )
-        {
-            free( boundary );
-            return 0;
-        }
-        else
-        {
-            free( boundary );
-        }
-    }
-    return 1;
+    return knet_write( &smtp->sd, buf, len );
 }
 
-static int attachFiles( Smtp smtp, FILE * fout )
+static int insertOneFile( Smtp smtp, const char * boundary, const char * name,
+        const char * ctype, const char * disposition, const char * cid,
+        FILE * log )
 {
-    AFile file = lfirst( smtp->afiles );
+    string mime_name;
+    string b64;
+    string out = snew();
+    const char * mime_type = getMimeType( name, ctype );
 
-    while( file )
+    if( !out )
     {
-        string mime_name;
-        string b64;
-        string out = snew();
-        const char * mime_type = getMimeType( file->name, file->ctype );
+        smtpFormatError( smtp, "attachFile(\"%s\"), internal error 1", name );
+        return 0;
+    }
+    FILE * f = fopen( name, "rb" );
+    if( !f )
+    {
+        smtpFormatError( smtp, "attachFile(\"%s\") : %s", name,
+                strerror( errno ) );
+        return 0;
+    }
+    mime_name = mimeFileName( name, *smtp->cprefix ? smtp->charset : NULL );
+    if( !mime_name )
+    {
+        fclose( f );
+        smtpFormatError( smtp, "attachFile(\"%s\"), internal error 2", name );
+        return 0;
+    }
+    if( !sprint( out, "\r\n--%s\r\n"
+            "Content-Transfer-Encoding: base64\r\n"
+            "Content-Type: %s; name=\"%s\"\r\n"
+            "Content-Disposition: %s; filename=\"%s\"\r\n"
+            "%s%s%s"
+            "\r\n", boundary, mime_type, sstr( mime_name ), disposition,
+            sstr( mime_name ), cid ? "Content-ID: <" : "", cid ? cid : "",
+            cid ? ">\r\n" : "" ) )
+    {
+        fclose( f );
+        sdel( mime_name );
+        smtpFormatError( smtp, "attachFile(\"%s\"), internal error 3", name );
+        return 0;
+    }
 
-        if( !out )
-        {
-            smtpFormatError( smtp, "attachFile(\"%s\"), internal error 1",
-                    file->name );
-            return 0;
-        }
-        FILE * f = fopen( file->name, "rb" );
-        if( !f )
-        {
-            smtpFormatError( smtp, "attachFile(\"%s\") : %s", file->name,
-                    strerror( errno ) );
-            return 0;
-        }
-        mime_name = mimeFileName( file->name,
-                *smtp->cprefix ? smtp->charset : NULL );
-        if( !mime_name )
-        {
-            fclose( f );
-            smtpFormatError( smtp, "attachFile(\"%s\"), internal error 2",
-                    file->name );
-            return 0;
-        }
-        if( !sprint( out, "\r\n--%s\r\n"
-                "Content-Transfer-Encoding: base64\r\n"
-                "Content-Type: %s; name=\"%s\"\r\n"
-                "Content-Disposition: attachment; filename=\"%s\"\r\n"
-                "\r\n", smtp->boundary, mime_type, sstr( mime_name ),
-                sstr( mime_name ) ) )
-        {
-            fclose( f );
-            sdel( mime_name );
-            smtpFormatError( smtp, "attachFile(\"%s\"), internal error 3",
-                    file->name );
-            return 0;
-        }
+    b64 = base64_fencode( f );
+    if( !b64 )
+    {
+        fclose( f );
+        sdel( mime_name );
+        sdel( out );
+        smtpFormatError( smtp, "attachFile(\"%s\"), internal error 4", name );
+        return 0;
+    }
 
-        b64 = base64_fencode( f );
-        if( !b64 )
-        {
-            fclose( f );
-            sdel( mime_name );
-            sdel( out );
-            smtpFormatError( smtp, "attachFile(\"%s\"), internal error 4",
-                    file->name );
-            return 0;
-        }
-
-        if( !knet_write( &smtp->sd, sstr( out ), slen( out ) )
-                || !knet_write( &smtp->sd, sstr( b64 ), slen( b64 ) ) )
-        {
-            fclose( f );
-            sdel( mime_name );
-            sdel( b64 );
-            sdel( out );
-            smtpFormatError( smtp, "attachFile(\"%s\"), internal error 5",
-                    file->name );
-            return 0;
-        }
-
-//        fprintf( fout, "%s%s", sstr( out ), sstr( b64 ) );
+    if( !ksmtp_write( smtp, sstr( out ), slen( out ), log )
+            || !ksmtp_write( smtp, sstr( b64 ), slen( b64 ), log )
+            || !ksmtp_write( smtp, "\r\n", 2, log ) )
+    {
+        fclose( f );
         sdel( mime_name );
         sdel( b64 );
         sdel( out );
-        file = lnext( smtp->afiles );
+        smtpFormatError( smtp, "attachFile(\"%s\"), internal error 5", name );
+        return 0;
     }
 
+    sdel( mime_name );
+    sdel( b64 );
+    sdel( out );
     return 1;
 }
 
-int processMessage( Smtp smtp, string msg )
+static int embedFiles( Smtp smtp, const char * boundary, FILE * log )
+{
+    EFile file = lfirst( smtp->efiles );
+    while( file )
+    {
+        if( !insertOneFile( smtp, boundary, file->name, file->ctype, "inline",
+                file->cid, log ) ) return 0;
+        file = lnext( smtp->efiles );
+    }
+    return 1;
+}
+
+static int attachFiles( Smtp smtp, const char * boundary, FILE * log )
+{
+    AFile file = lfirst( smtp->afiles );
+    while( file )
+    {
+        if( !insertOneFile( smtp, boundary, file->name, file->ctype,
+                "attachment", NULL, log ) ) return 0;
+        file = lnext( smtp->afiles );
+    }
+    return 1;
+}
+
+static int write_boundary_end( Smtp smtp, const char * boundary, FILE * log )
+{
+    return ksmtp_write( smtp, "--", 2, log )
+            && ksmtp_write( smtp, boundary, strlen( boundary ), log )
+            && ksmtp_write( smtp, "--\r\n", 4, log );
+}
+
+static int write_boundary( Smtp smtp, const char * boundary, FILE * log )
+{
+    return ksmtp_write( smtp, "--", 2, log )
+            && ksmtp_write( smtp, boundary, strlen( boundary ), log )
+            && ksmtp_write( smtp, "\r\n", 2, log );
+}
+
+int processMessage( Smtp smtp, string headers )
 {
     Addr addr;
+    char mp_boundary[36];
+    char r_boundary[36];
+    string textparts = NULL;
+    string related = NULL;
+    FILE * log = NULL;
 
-    if( !smtp_mail_from( smtp, smtp->from->email ) ) return 0;
+    if( smtp->flags & KSMTP_DEBUG )
+    {
+        log = fopen( "/home/klopp/tmp/ksmtp.log", "w" );
+    }
+
+    if( !smtp_mail_from( smtp, smtp->from->email ) )
+    {
+        fclose( log );
+        return 0;
+    }
 
     addr = lfirst( smtp->to );
     while( addr )
     {
-        if( !smtp_rcpt_to( smtp, addr->email ) ) return 0;
+        if( !smtp_rcpt_to( smtp, addr->email ) )
+        {
+            fclose( log );
+            return 0;
+        }
         addr = lnext( smtp->to );
     }
     addr = lfirst( smtp->cc );
     while( addr )
     {
-        if( !smtp_rcpt_to( smtp, addr->email ) ) return 0;
+        if( !smtp_rcpt_to( smtp, addr->email ) )
+        {
+            fclose( log );
+            return 0;
+        }
         addr = lnext( smtp->cc );
     }
     addr = lfirst( smtp->bcc );
     while( addr )
     {
-        if( !smtp_rcpt_to( smtp, addr->email ) ) return 0;
+        if( !smtp_rcpt_to( smtp, addr->email ) )
+        {
+            fclose( log );
+            return 0;
+        }
         addr = lnext( smtp->bcc );
     }
 
-    if( !smtp_data( smtp ) ) return 0;
-    if( !knet_write( &smtp->sd, sstr( msg ), slen( msg ) ) ) return 0;
-
-    if( smtp->afiles->size )
+    if( !smtp_data( smtp )
+            || !ksmtp_write( smtp, sstr( headers ), slen( headers ), log ) )
     {
-        if( !attachFiles( smtp, NULL ) ) return 0;
+        fclose( log );
+        return 0;
     }
 
-    if( smtp->boundary )
+    textparts = makeTextParts( smtp );
+    if( !textparts )
     {
-        if( !knet_write( &smtp->sd, "\r\n--", sizeof("\r\n--") - 1 )
-                || !knet_write( &smtp->sd, smtp->boundary,
-                        strlen( smtp->boundary ) )
-                || !knet_write( &smtp->sd, "--\r\n", sizeof("--\r\n") - 1 ) ) return 0;
+        fclose( log );
+        return 0;
     }
-
-    return smtp_end_data( smtp );
-}
-
-string createMessage( Smtp smtp )
-{
-    string msg = snew();
-
-    if( (smtp->afiles->size) || smtp->parts->size > 1 )
+    if( smtp->efiles->size )
     {
-        smtp->boundary = mimeMakeBoundary();
-        if( !smtp->boundary )
+        mimeMakeBoundary( r_boundary );
+        related = sfromchar( "Content-Type: multipart/related; boundary=\"" );
+        if( !related || !scatc( related, r_boundary )
+                || !scatc( related, "\"\r\n\r\n" ) )
         {
-            sdel( msg );
-            return NULL;
+            fclose( log );
+            sdel( textparts );
+            sdel( related );
+            return 0;
         }
     }
 
-    if( !createHeaders( smtp, msg ) )
+    if( smtp->afiles->size )
     {
-        sdel( msg );
-        return NULL;
+        mimeMakeBoundary( mp_boundary );
+        string multipart = sfromchar(
+                "Content-Type: multipart/mixed; boundary=\"" );
+        if( !multipart || !scatc( multipart, mp_boundary )
+                || !scatc( multipart, "\"\r\n\r\n" ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( multipart );
+            sdel( related );
+            return 0;
+        }
+        if( !ksmtp_write( smtp, sstr( multipart ), slen( multipart ), log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( multipart );
+            sdel( related );
+            return 0;
+        }
+        if( slen(textparts) && !write_boundary( smtp, mp_boundary, log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( multipart );
+            sdel( related );
+            return 0;
+        }
+        if( related
+                && !ksmtp_write( smtp, sstr( related ), slen( related ), log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( multipart );
+            sdel( related );
+            return 0;
+        }
+        if( slen( textparts ) )
+        {
+            if( !ksmtp_write( smtp, sstr( textparts ), slen( textparts ),
+                    log ) )
+            {
+                fclose( log );
+                sdel( textparts );
+                sdel( multipart );
+                sdel( related );
+                return 0;
+            }
+        }
+        if( related && !write_boundary_end( smtp, r_boundary, log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( multipart );
+            sdel( related );
+            return 0;
+        }
+
+        if( !attachFiles( smtp, mp_boundary, log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( multipart );
+            sdel( related );
+            return 0;
+
+        }
+        if( !write_boundary_end( smtp, mp_boundary, log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( multipart );
+            sdel( related );
+            return 0;
+        }
+        sdel( multipart );
+    }
+    else if( smtp->efiles->size )
+    {
+        if( !ksmtp_write( smtp, sstr( related ), slen( related ), log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( related );
+            return 0;
+        }
+        if( !write_boundary( smtp, r_boundary, log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( related );
+            return 0;
+        }
+        if( !ksmtp_write( smtp, sstr( textparts ), slen( textparts ), log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( related );
+            return 0;
+        }
+        if( !embedFiles( smtp, r_boundary, log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( related );
+            return 0;
+        }
+        if( !write_boundary_end( smtp, r_boundary, log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            sdel( related );
+            return 0;
+        }
+    }
+    else
+    {
+        if( slen( textparts )
+                && !ksmtp_write( smtp, sstr( textparts ), slen( textparts ),
+                        log ) )
+        {
+            fclose( log );
+            sdel( textparts );
+            return 0;
+        }
     }
 
-    if( smtp->parts->size && !makeMessage( smtp, msg ) )
-    {
-        sdel( msg );
-        return NULL;
-    }
-    return msg;
+    fclose( log );
+    sdel( textparts );
+    sdel( related );
+    return smtp_end_data( smtp );
 }
-
