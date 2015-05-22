@@ -165,12 +165,19 @@ static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )
     size_t left = sz;
     fd_set fdwrite;
     struct timeval timeout;
+    int to = sd->timeout + time(NULL);
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
 
     while( left )
     {
+        if( time(NULL) > to  )
+        {
+            sd->flags |= _SOCKET_ERROR;
+            sd->error = EPIPE;
+            return -1;
+        }
         FD_ZERO( &fdwrite );
         FD_SET( sd->sock, &fdwrite );
 
@@ -212,12 +219,20 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
     fd_set fdread;
     struct timeval timeout;
     int write_blocked_on_read = 0;
+    int to = time(NULL) + sd->timeout;
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
 
     while( left )
     {
+        if( time(NULL) > to )
+        {
+            sd->flags |= _SOCKET_ERROR;
+            sd->error = EPIPE;
+            return -1;
+        }
+
         FD_ZERO( &fdwrite );
         FD_ZERO( &fdread );
         FD_SET( sd->sock, &fdwrite );
@@ -289,12 +304,19 @@ static int _knet_read_ssl( ksocket sd )
     struct timeval timeout;
     int read_blocked_on_write = 0;
     int bFinish = 0;
+    int to = time(NULL) + sd->timeout;
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
 
     while( !bFinish )
     {
+        if( time(NULL) > to )
+        {
+            sd->flags |= _SOCKET_ERROR;
+            sd->error = EPIPE;
+            return -1;
+        }
         FD_ZERO( &fdread );
         FD_ZERO( &fdwrite );
         FD_SET( sd->sock, &fdread );
@@ -311,7 +333,6 @@ static int _knet_read_ssl( ksocket sd )
             sd->error = errno;
             return -1;
         }
-
         if( rc == 0 )
         {
             sd->flags |= _SOCKET_ERROR;
@@ -319,11 +340,18 @@ static int _knet_read_ssl( ksocket sd )
             return -1;
 
         }
+
         if( FD_ISSET( sd->sock, &fdread )
                 || (read_blocked_on_write && FD_ISSET( sd->sock, &fdwrite )) )
         {
             while( 1 )
             {
+                if( time(NULL) > to )
+                {
+                    sd->flags |= _SOCKET_ERROR;
+                    sd->error = EPIPE;
+                    return -1;
+                }
                 read_blocked_on_write = 0;
 
                 rc = SSL_read( sd->ssl, sd->buf + readed,
