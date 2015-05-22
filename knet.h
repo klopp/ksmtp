@@ -8,11 +8,11 @@
 #ifndef KNET_H_
 #define KNET_H_
 
-#include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
 
 #ifndef __WINDOWS__
+#include <unistd.h>
 #include <sys/utsname.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

@@ -27,12 +27,14 @@ static void _rand_seed( void )
     struct
     {
         time_t tt;
-        pid_t pid;
 #ifndef __WINDOWS__
         uid_t uid;
         uid_t euid;
         gid_t gid;
         gid_t egid;
+        pid_t pid;
+#else
+        int pid;
 #endif
     } data;
 
@@ -409,11 +411,12 @@ int knet_read( ksocket sd, char * buf, size_t sz )
     size_t left = sz;
     while( left )
     {
+        size_t tomove;
         if( sd->cursor >= sd->inbuf )
         {
             if( _knet_getbuf( sd ) == -1 ) return 0;
         }
-        size_t tomove =
+        tomove =
                 sd->inbuf - sd->cursor > left ? left : sd->inbuf - sd->cursor;
         memcpy( buf, sd->buf + sd->cursor, tomove );
         buf += tomove;

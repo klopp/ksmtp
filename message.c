@@ -294,6 +294,7 @@ static int insertOneFile( Smtp smtp, const char * boundary, const char * name,
         const char * ctype, const char * disposition, const char * cid,
         FILE * log )
 {
+    FILE * f;
     string mime_name;
     string b64;
     string out = snew();
@@ -304,7 +305,7 @@ static int insertOneFile( Smtp smtp, const char * boundary, const char * name,
         smtpFormatError( smtp, "attachFile(\"%s\"), internal error 1", name );
         return 0;
     }
-    FILE * f = fopen( name, "rb" );
+    f = fopen( name, "rb" );
     if( !f )
     {
         smtpFormatError( smtp, "attachFile(\"%s\") : %s", name,

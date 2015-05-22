@@ -60,9 +60,10 @@ static char * _stripEmail( char *str )
 
 Addr createAddr( const char * src )
 {
+    char * scopy;
     Addr addr = calloc( sizeof(struct _Addr), 1 );
     if( !addr ) return NULL;
-    char * scopy = strdup( src );
+    scopy = strdup( src );
     if( !scopy )
     {
         free( addr );
