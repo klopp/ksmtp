@@ -144,8 +144,8 @@ int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype,
     }
     strncpy( part->charset, charset ? charset : smtp->charset,
             sizeof(part->charset) - 1 );
-    if( !isUsAsciiCs( part->charset ) ) sprintf( part->cprefix, "=?%s?B?",
-            charset );
+    if( !isUsAsciiCs( part->charset ) ) spnrintf( part->cprefix,
+            sizeof(part->cprefix) - 1, "=?%s?B?", part->charset );
     else *part->cprefix = 0;
     if( !ladd( smtp->parts, part ) )
     {
@@ -359,7 +359,8 @@ void smtpSetNodename( Smtp smtp, const char * node )
 void smtpSetCharset( Smtp smtp, const char * charset )
 {
     strncpy( smtp->charset, charset, sizeof(smtp->charset) - 1 );
-    if( !isUsAsciiCs( charset ) ) sprintf( smtp->cprefix, "=?%s?B?", charset );
+    if( !isUsAsciiCs( charset ) ) snprintf( smtp->cprefix,
+            sizeof(smtp->cprefix) - 1, "=?%s?B?", charset );
     else *smtp->cprefix = 0;
 }
 
