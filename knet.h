@@ -38,7 +38,7 @@ enum
     _SOCKET_ERROR = 0x01, _SOCKET_EOF = 0x02
 };
 
-#define MAXSOCKBUF  4096
+#define SOCK_BUF_LEN  4096
 
 typedef struct _ksocket
 {
@@ -48,7 +48,7 @@ typedef struct _ksocket
     int error;
     int avail;
     char *bufptr;
-    char buf[MAXSOCKBUF];
+    char buf[SOCK_BUF_LEN];
     SSL_CTX *ctx;
     SSL *ssl;
 } *ksocket;

@@ -144,7 +144,7 @@ int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype,
     }
     strncpy( part->charset, charset ? charset : smtp->charset,
             sizeof(part->charset) - 1 );
-    if( !isUsAsciiCs( part->charset ) ) spnrintf( part->cprefix,
+    if( !isUsAsciiCs( part->charset ) ) snprintf( part->cprefix,
             sizeof(part->cprefix) - 1, "=?%s?B?", part->charset );
     else *part->cprefix = 0;
     if( !ladd( smtp->parts, part ) )

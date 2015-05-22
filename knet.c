@@ -52,7 +52,7 @@ static void _rand_seed( void )
     RAND_seed( &data, sizeof(data) );
 }
 
-int knet_init(void)
+int knet_init( void )
 {
 #if defined(__WINDOWS__)
     WSADATA wsaData;
@@ -147,7 +147,6 @@ int knet_use_tls( ksocket sd )
         sd->ctx = NULL;
         return 0;
     }
-
     return 1;
 }
 
@@ -175,10 +174,7 @@ void knet_close( ksocket sd )
         {
             SSL_shutdown( sd->ssl );
             SSL_free( sd->ssl );
-            if( sd->ctx )
-            {
-                SSL_CTX_free( sd->ctx );
-            }
+            if( sd->ctx ) SSL_CTX_free( sd->ctx );
         }
     }
 }
@@ -192,14 +188,14 @@ int knet_getc( ksocket sd )
         int recval = 0;
         sd->eom = 0;
         sd->flags = 0;
-        memset( sd->buf, '\0', MAXSOCKBUF );
+        memset( sd->buf, 0, SOCK_BUF_LEN );
         if( !sd->ssl )
         {
-            recval = recv( sd->sock, sd->buf, MAXSOCKBUF - 1, 0 );
+            recval = recv( sd->sock, sd->buf, SOCK_BUF_LEN, 0 );
         }
         else
         {
-            recval = SSL_read( sd->ssl, sd->buf, MAXSOCKBUF - 1 );
+            recval = SSL_read( sd->ssl, sd->buf, SOCK_BUF_LEN );
         }
         if( recval == 0 )
         {
@@ -216,7 +212,7 @@ int knet_getc( ksocket sd )
         {
             sd->bufptr = sd->buf;
             sd->avail = recval;
-            if( recval < MAXSOCKBUF - 1 )
+            if( recval < SOCK_BUF_LEN )
             {
                 sd->eom = 1;
             }
@@ -300,11 +296,8 @@ int knet_write( ksocket sd, const char *buf, size_t len )
     {
         while( len > 0 )
         {
-//            const size_t blocklen = 4356;
-//            size_t sendSize = (len > blocklen) ? blocklen : len;
-            //            int bytes = send( sd->sock, buf, sendSize, 0 );
             int bytes = send( sd->sock, buf,
-                    (len > MAXSOCKBUF) ? MAXSOCKBUF : len, 0 );
+                    (len > SOCK_BUF_LEN) ? SOCK_BUF_LEN : len, 0 );
             if( bytes == -1 )
             {
                 if( errno == EAGAIN )
