@@ -435,6 +435,13 @@ int processMessage( Smtp smtp, string headers )
         log = fopen( "/home/klopp/tmp/ksmtp.log", "w" );
     }
 
+    textparts = makeTextParts( smtp );
+    if( !textparts )
+    {
+        rc = 0;
+        goto pmend;
+    }
+
     if( !smtp_mail_from( smtp, smtp->from->email ) )
     {
         rc = 0;
@@ -479,12 +486,6 @@ int processMessage( Smtp smtp, string headers )
         goto pmend;
     }
 
-    textparts = makeTextParts( smtp );
-    if( !textparts )
-    {
-        rc = 0;
-        goto pmend;
-    }
     if( smtp->efiles->size )
     {
         mimeMakeBoundary( r_boundary );
@@ -530,28 +531,6 @@ int processMessage( Smtp smtp, string headers )
                 goto pmend;
             }
         }
-        /*
-         if( related
-         && !ksmtp_write( smtp, sstr( related ), slen( related ), log ) )
-         {
-         rc = 0;
-         goto pmend;
-         }
-         if( slen( textparts ) )
-         {
-         if( !ksmtp_write( smtp, sstr( textparts ), slen( textparts ),
-         log ) )
-         {
-         rc = 0;
-         goto pmend;
-         }
-         }
-         if( related && !write_boundary_end( smtp, r_boundary, log ) )
-         {
-         rc = 0;
-         goto pmend;
-         }
-         */
 
         if( !attachFiles( smtp, mp_boundary, log )
                 || !write_boundary_end( smtp, mp_boundary, log ) )
