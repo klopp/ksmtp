@@ -165,7 +165,7 @@ static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )
     size_t left = sz;
     fd_set fdwrite;
     struct timeval timeout;
-    int to = sd->timeout + time(NULL);
+    time_t to = sd->timeout + time(NULL);
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
@@ -219,7 +219,7 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
     fd_set fdread;
     struct timeval timeout;
     int write_blocked_on_read = 0;
-    int to = time(NULL) + sd->timeout;
+    time_t to = time(NULL) + sd->timeout;
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
@@ -304,7 +304,7 @@ static int _knet_read_ssl( ksocket sd )
     struct timeval timeout;
     int read_blocked_on_write = 0;
     int bFinish = 0;
-    int to = time(NULL) + sd->timeout;
+    time_t to = time(NULL) + sd->timeout;
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
