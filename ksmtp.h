@@ -59,7 +59,10 @@ typedef struct _TextPart
 
 typedef enum _KsmtpFlags
 {
-    KSMTP_DEBUG = 0x01, KSMTP_USE_TLS = 0x02, KSMTP_DEFAULT = 0x00
+    KSMTP_VERBOSE_MSG = 0x01,
+    KSMTP_VERBOSE_SMTP = 0x02,
+    KSMTP_USE_TLS = 0x10,
+    KSMTP_DEFAULT = 0x00
 } KsmtpFlags;
 
 typedef struct _Smtp

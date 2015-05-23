@@ -284,15 +284,14 @@ static int makeExtraHeaders( Smtp smtp, string msg )
     return 1;
 }
 
-static int ksmtp_write( Smtp smtp, const char * buf, size_t len, FILE * log )
+static int ksmtp_write( Smtp smtp, const char * buf, size_t len )
 {
-    if( log ) fwrite( buf, len, 1, log );
+    if( smtp->flags & KSMTP_VERBOSE_MSG ) fwrite( buf, len, 1, stderr );
     return knet_write( &smtp->sd, buf, len );
 }
 
 static int insertOneFile( Smtp smtp, const char * boundary, const char * name,
-        const char * ctype, const char * disposition, const char * cid,
-        FILE * log )
+        const char * ctype, const char * disposition, const char * cid )
 {
     FILE * f;
     string mime_name;
@@ -358,9 +357,9 @@ static int insertOneFile( Smtp smtp, const char * boundary, const char * name,
         return 0;
     }
 
-    if( !ksmtp_write( smtp, sstr( out ), slen( out ), log )
-            || !ksmtp_write( smtp, sstr( b64 ), slen( b64 ), log )
-            || !ksmtp_write( smtp, "\r\n", 2, log ) )
+    if( !ksmtp_write( smtp, sstr( out ), slen( out ) )
+            || !ksmtp_write( smtp, sstr( b64 ), slen( b64 ) )
+            || !ksmtp_write( smtp, "\r\n", 2 ) )
     {
         fclose( f );
         sdel( mime_name );
@@ -376,42 +375,42 @@ static int insertOneFile( Smtp smtp, const char * boundary, const char * name,
     return 1;
 }
 
-static int embedFiles( Smtp smtp, const char * boundary, FILE * log )
+static int embedFiles( Smtp smtp, const char * boundary )
 {
     EFile file = lfirst( smtp->efiles );
     while( file )
     {
         if( !insertOneFile( smtp, boundary, file->name, file->ctype, "inline",
-                file->cid, log ) ) return 0;
+                file->cid ) ) return 0;
         file = lnext( smtp->efiles );
     }
     return 1;
 }
 
-static int attachFiles( Smtp smtp, const char * boundary, FILE * log )
+static int attachFiles( Smtp smtp, const char * boundary )
 {
     AFile file = lfirst( smtp->afiles );
     while( file )
     {
         if( !insertOneFile( smtp, boundary, file->name, file->ctype,
-                "attachment", NULL, log ) ) return 0;
+                "attachment", NULL ) ) return 0;
         file = lnext( smtp->afiles );
     }
     return 1;
 }
 
-static int write_boundary_end( Smtp smtp, const char * boundary, FILE * log )
+static int write_boundary_end( Smtp smtp, const char * boundary )
 {
-    return ksmtp_write( smtp, "--", 2, log )
-            && ksmtp_write( smtp, boundary, strlen( boundary ), log )
-            && ksmtp_write( smtp, "--\r\n", 4, log );
+    return ksmtp_write( smtp, "--", 2 )
+            && ksmtp_write( smtp, boundary, strlen( boundary ) )
+            && ksmtp_write( smtp, "--\r\n", 4 );
 }
 
-static int write_boundary( Smtp smtp, const char * boundary, FILE * log )
+static int write_boundary( Smtp smtp, const char * boundary )
 {
-    return ksmtp_write( smtp, "--", 2, log )
-            && ksmtp_write( smtp, boundary, strlen( boundary ), log )
-            && ksmtp_write( smtp, "\r\n", 2, log );
+    return ksmtp_write( smtp, "--", 2 )
+            && ksmtp_write( smtp, boundary, strlen( boundary ) )
+            && ksmtp_write( smtp, "\r\n", 2 );
 }
 
 string createHeaders( Smtp smtp )
@@ -442,13 +441,7 @@ int processMessage( Smtp smtp, string headers )
     string textparts = NULL;
     string related = NULL;
     string multipart = NULL;
-    FILE * log = NULL;
     int rc = 1;
-
-    if( smtp->flags & KSMTP_DEBUG )
-    {
-        log = fopen( "/home/klopp/tmp/ksmtp.log", "w" );
-    }
 
     textparts = makeTextParts( smtp );
     if( !textparts )
@@ -495,7 +488,7 @@ int processMessage( Smtp smtp, string headers )
     }
 
     if( !smtp_data( smtp )
-            || !ksmtp_write( smtp, sstr( headers ), slen( headers ), log ) )
+            || !ksmtp_write( smtp, sstr( headers ), slen( headers ) ) )
     {
         rc = 0;
         goto pmend;
@@ -523,12 +516,12 @@ int processMessage( Smtp smtp, string headers )
             rc = 0;
             goto pmend;
         }
-        if( !ksmtp_write( smtp, sstr( multipart ), slen( multipart ), log ) )
+        if( !ksmtp_write( smtp, sstr( multipart ), slen( multipart ) ) )
         {
             rc = 0;
             goto pmend;
         }
-        if( slen(textparts) && !write_boundary( smtp, mp_boundary, log ) )
+        if( slen(textparts) && !write_boundary( smtp, mp_boundary ) )
         {
             rc = 0;
             goto pmend;
@@ -536,19 +529,20 @@ int processMessage( Smtp smtp, string headers )
 
         if( related )
         {
-            if( !ksmtp_write( smtp, sstr( related ), slen( related ), log )
-                    || !write_boundary( smtp, r_boundary, log )
-                    || !ksmtp_write( smtp, sstr( textparts ), slen( textparts ),
-                            log ) || !embedFiles( smtp, r_boundary, log )
-                    || !write_boundary_end( smtp, r_boundary, log ) )
+            if( !ksmtp_write( smtp, sstr( related ), slen( related ) )
+                    || !write_boundary( smtp, r_boundary )
+                    || !ksmtp_write( smtp, sstr( textparts ),
+                            slen( textparts ) )
+                    || !embedFiles( smtp, r_boundary )
+                    || !write_boundary_end( smtp, r_boundary ) )
             {
                 rc = 0;
                 goto pmend;
             }
         }
 
-        if( !attachFiles( smtp, mp_boundary, log )
-                || !write_boundary_end( smtp, mp_boundary, log ) )
+        if( !attachFiles( smtp, mp_boundary )
+                || !write_boundary_end( smtp, mp_boundary ) )
         {
             rc = 0;
             goto pmend;
@@ -556,11 +550,11 @@ int processMessage( Smtp smtp, string headers )
     }
     else if( smtp->efiles->size )
     {
-        if( !ksmtp_write( smtp, sstr( related ), slen( related ), log )
-                || !write_boundary( smtp, r_boundary, log )
-                || !ksmtp_write( smtp, sstr( textparts ), slen( textparts ),
-                        log ) || !embedFiles( smtp, r_boundary, log )
-                || !write_boundary_end( smtp, r_boundary, log ) )
+        if( !ksmtp_write( smtp, sstr( related ), slen( related ) )
+                || !write_boundary( smtp, r_boundary )
+                || !ksmtp_write( smtp, sstr( textparts ), slen( textparts ) )
+                || !embedFiles( smtp, r_boundary )
+                || !write_boundary_end( smtp, r_boundary ) )
         {
             rc = 0;
             goto pmend;
@@ -569,15 +563,13 @@ int processMessage( Smtp smtp, string headers )
     else
     {
         if( slen( textparts )
-                && !ksmtp_write( smtp, sstr( textparts ), slen( textparts ),
-                        log ) )
+                && !ksmtp_write( smtp, sstr( textparts ), slen( textparts ) ) )
         {
             rc = 0;
             goto pmend;
         }
     }
-    pmend: if( log ) fclose( log );
-    sdel( textparts );
+    pmend: sdel( textparts );
     sdel( multipart );
     sdel( related );
     return rc ? smtp_end_data( smtp ) : 0;

@@ -23,7 +23,7 @@ static int smtp_answer( Smtp smtp )
             return 0;
         }
         scpyc( smtp->current, buf );
-        while( (c = knet_getc( &smtp->sd )) != '\n' && !smtp->sd.eof/*!knet_eof( &smtp->sd )*/ )
+        while( (c = knet_getc( &smtp->sd )) != '\n' && !smtp->sd.eof/*!knet_eof( &smtp->sd )*/)
         {
             if( c == -1 )
             {
@@ -36,16 +36,27 @@ static int smtp_answer( Smtp smtp )
                 scatch( smtp->current, c );
             }
         }
+        if( smtp->flags & KSMTP_VERBOSE_SMTP )
+        {
+            schomp( smtp->current );
+            fprintf( stderr, "<<< %s\n", sstr( smtp->current ) );
+        }
 
     } while( buf[3] != ' ' );
 
     return (buf[0] - '0') * 100 + (buf[1] - '0') * 10 + (buf[2] - '0');
 }
 
-static int smtp_write( Smtp smtp, const char * buf, size_t size )
+static int smtp_write( Smtp smtp, const char * buf )
 {
-    knet_write( &smtp->sd, buf, size );
-    if( smtp->sd.error/*knet_error( &smtp->sd )*/ )
+    if( smtp->flags & KSMTP_VERBOSE_SMTP )
+    {
+        scpyc( smtp->current, buf );
+        schomp( smtp->current );
+        fprintf( stderr, ">>> %s\n", sstr( smtp->current ) );
+    }
+    knet_write( &smtp->sd, buf, strlen( buf ) );
+    if( smtp->sd.error/*knet_error( &smtp->sd )*/)
     {
         smtpFormatError( smtp, "smtp_write(): %s",
                 knet_error_msg( &smtp->sd ) );
@@ -57,7 +68,7 @@ static int smtp_write( Smtp smtp, const char * buf, size_t size )
 static int smtp_cmd( Smtp smtp, const char * cmd, int ok, int ko )
 {
     int rc;
-    if( cmd && !smtp_write( smtp, cmd, strlen( cmd ) ) ) return 0;
+    if( cmd && !smtp_write( smtp, cmd ) ) return 0;
     rc = smtp_answer( smtp );
     if( !rc ) return 0;
     if( rc == ok ) return rc;

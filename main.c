@@ -21,7 +21,7 @@ int main( void )
             //"<img src=\"test.png\" />\n"
             "</body></html>";
 
-    Smtp smtp = smtpCreate( /*KSMTP_USE_TLS | */KSMTP_DEBUG );
+    Smtp smtp = smtpCreate( /*KSMTP_USE_TLS| */ /*KSMTP_VERBOSE_MSG|*/KSMTP_VERBOSE_SMTP );
 
      #define USER        "vsevolod.lutovinov@ibic.se"
      #define PASSWORD    "0UnrsZvNYGby"
@@ -62,12 +62,16 @@ int main( void )
 //    smtpAddUtfTextPart( smtp, "кукукук", "html" );
     smtpAddTextPart( smtp, html, "html", "us-ascii" );
 
-//    smtpAddHeader( smtp, "X-Custom-One", "One" );
-//    smtpAddHeader( smtp, "X-Custom-Two", "Two" );
+    smtpAddHeader( smtp, "X-Custom-One", "One" );
+    smtpAddHeader( smtp, "X-Custom-Two", "Two" );
 
+#ifndef __WINDOWS__
     smtpEmbedFile( smtp, "/home/klopp/tmp/1.png", NULL );
     smtpAttachFile( smtp, "/home/klopp/tmp/test.png", NULL );
-//    smtpAttachFile( smtp, "/home/klopp/tmp/проба.png", NULL );
+#else
+    smtpEmbedFile( smtp, "/tmp/0.png", NULL );
+    smtpAttachFile( smtp, "/tmp/0.png", NULL );
+#endif
 
     if( !knet_init() )
     {
