@@ -34,19 +34,20 @@
 #endif
 #endif
 
+/*
 enum
 {
     _SOCKET_ERROR = 0x01, _SOCKET_EOF = 0x02
 };
+*/
 
 #define SOCK_BUF_LEN  4096
 
 typedef struct _ksocket
 {
     int timeout;
-    int eom;
+    int eof;
     int sock;
-    int flags;
     int error;
     int inbuf;
     int cursor;
@@ -64,8 +65,10 @@ int knet_getc( ksocket sd );
 int knet_verify_sert( ksocket sd );
 void knet_close( ksocket sd );
 int knet_init_tls( ksocket sd );
-int knet_error( ksocket sd );
 char * knet_error_msg( ksocket sd );
+/*
+int knet_error( ksocket sd );
 int knet_eof( ksocket sd );
+*/
 
 #endif /* KNET_H_ */

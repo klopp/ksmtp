@@ -7,16 +7,18 @@
 
 #include "knet.h"
 
-int knet_error( ksocket sd )
-{
-    return sd->flags & _SOCKET_ERROR;
-}
+/*
+ int knet_error( ksocket sd )
+ {
+ return sd->flags & _SOCKET_ERROR;
+ }
 
-int knet_eof( ksocket sd )
-{
-    return sd->flags & _SOCKET_EOF;
-}
+ int knet_eof( ksocket sd )
+ {
+ return sd->flags & _SOCKET_EOF;
+ }
 
+ */
 char * knet_error_msg( ksocket sd )
 {
     return strerror( sd->error );
@@ -27,14 +29,12 @@ static void _rand_seed( void )
     struct
     {
         time_t tt;
+        pid_t pid;
 #ifndef __WINDOWS__
         uid_t uid;
         uid_t euid;
         gid_t gid;
         gid_t egid;
-        pid_t pid;
-#else
-        int pid;
 #endif
     } data;
 
@@ -168,16 +168,16 @@ static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )
     size_t left = sz;
     fd_set fdwrite;
     struct timeval timeout;
-    time_t to = sd->timeout + time(NULL);
+    time_t to = sd->timeout + time( NULL );
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
 
     while( left )
     {
-        if( time(NULL) > to  )
+        if( time( NULL ) > to )
         {
-            sd->flags |= _SOCKET_ERROR;
+            /*sd->flags |= _SOCKET_ERROR;*/
             sd->error = EPIPE;
             return -1;
         }
@@ -187,15 +187,16 @@ static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )
         if( (rc = select( sd->sock + 1, NULL, &fdwrite, NULL, &timeout ))
                 == -1 )
         {
-            sd->flags |= _SOCKET_ERROR;
+            /*sd->flags |= _SOCKET_ERROR;*/
             sd->error = errno;
             return -1;
         }
         if( rc == 0 )
         {
-            sd->flags |= _SOCKET_ERROR;
-            sd->error = EPIPE;
-            break;
+            continue;
+            //sd->flags |= _SOCKET_ERROR;
+            //sd->error = EPIPE;
+            //break;
         }
 
         if( FD_ISSET( sd->sock, &fdwrite ) )
@@ -203,7 +204,7 @@ static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )
             rc = send( sd->sock, buf, left, 0 );
             if( rc == -1 || rc == 0 )
             {
-                sd->flags |= _SOCKET_ERROR;
+                /*sd->flags |= _SOCKET_ERROR;*/
                 sd->error = errno;
                 return -1;
             }
@@ -222,16 +223,16 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
     fd_set fdread;
     struct timeval timeout;
     int write_blocked_on_read = 0;
-    time_t to = time(NULL) + sd->timeout;
+    time_t to = time( NULL ) + sd->timeout;
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
 
     while( left )
     {
-        if( time(NULL) > to )
+        if( time( NULL ) > to )
         {
-            sd->flags |= _SOCKET_ERROR;
+            /*sd->flags |= _SOCKET_ERROR;*/
             sd->error = EPIPE;
             return -1;
         }
@@ -246,18 +247,19 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
         }
 
         if( (rc = select( sd->sock + 1, &fdread, &fdwrite, NULL, &timeout ))
-                == -1 )
+                < 0 )
         {
-            sd->flags |= _SOCKET_ERROR;
+            /*sd->flags |= _SOCKET_ERROR;*/
             sd->error = errno;
             return -1;
         }
 
         if( rc == 0 )
         {
-            sd->flags |= _SOCKET_ERROR;
-            sd->error = EPIPE;
-            return -1;
+            continue;
+            //sd->flags |= _SOCKET_ERROR;
+            //sd->error = EPIPE;
+            //return -1;
         }
 
         if( FD_ISSET( sd->sock, &fdwrite )
@@ -282,7 +284,7 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
                     break;
 
                 default:
-                    sd->flags |= _SOCKET_ERROR;
+                    /*sd->flags |= _SOCKET_ERROR;*/
                     sd->error = errno;
                     return -1;
             }
@@ -307,16 +309,16 @@ static int _knet_read_ssl( ksocket sd )
     struct timeval timeout;
     int read_blocked_on_write = 0;
     int bFinish = 0;
-    time_t to = time(NULL) + sd->timeout;
+    time_t to = time( NULL ) + sd->timeout;
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
 
     while( !bFinish )
     {
-        if( time(NULL) > to )
+        if( time( NULL ) > to )
         {
-            sd->flags |= _SOCKET_ERROR;
+            /*sd->flags |= _SOCKET_ERROR;*/
             sd->error = EPIPE;
             return -1;
         }
@@ -332,15 +334,18 @@ static int _knet_read_ssl( ksocket sd )
         if( (rc = select( sd->sock + 1, &fdread, &fdwrite, NULL, &timeout ))
                 < 0 )
         {
-            sd->flags |= _SOCKET_ERROR;
+            /*sd->flags |= _SOCKET_ERROR;*/
             sd->error = errno;
             return -1;
         }
         if( rc == 0 )
         {
+            return 0;
+/*
             sd->flags |= _SOCKET_ERROR;
             sd->error = EPIPE;
             return -1;
+*/
 
         }
 
@@ -349,9 +354,9 @@ static int _knet_read_ssl( ksocket sd )
         {
             while( 1 )
             {
-                if( time(NULL) > to )
+                if( time( NULL ) > to )
                 {
-                    sd->flags |= _SOCKET_ERROR;
+                    /*sd->flags |= _SOCKET_ERROR;*/
                     sd->error = EPIPE;
                     return -1;
                 }
@@ -386,7 +391,7 @@ static int _knet_read_ssl( ksocket sd )
                 }
                 else
                 {
-                    sd->flags |= _SOCKET_ERROR;
+                    /*sd->flags |= _SOCKET_ERROR;*/
                     sd->error = errno;
                     return -1;
                 }
@@ -420,53 +425,59 @@ static int _knet_read_socket( ksocket sd )
 static int _knet_getbuf( ksocket sd )
 {
     int rc;
-    sd->eom = 0;
-    sd->flags = 0;
+    sd->eof = 0;
+    /*sd->flags = 0;*/
+    sd->error = 0;
     sd->inbuf = sd->cursor = 0;
     memset( sd->buf, 0, SOCK_BUF_LEN );
     rc = sd->ssl ? _knet_read_ssl( sd ) : _knet_read_socket( sd );
     if( rc == 0 )
     {
-        sd->flags |= _SOCKET_EOF;
-        sd->error = EPIPE;
+        /*sd->flags |= _SOCKET_EOF;*/
+        sd->eof = 1;
+        /*sd->error = EPIPE;*/
         return -1;
     }
     else if( rc == -1 )
     {
-        sd->flags |= _SOCKET_ERROR;
+        /*sd->flags |= _SOCKET_ERROR;*/
         sd->error = errno;
         return -1;
     }
     sd->inbuf = rc;
     if( rc < SOCK_BUF_LEN )
     {
-        sd->eom = 1;
-    }
-    else
-    {
-        sd->eom = 0;
+        /*sd->eof = 1;*/
     }
     return rc;
 }
 
 int knet_read( ksocket sd, char * buf, size_t sz )
 {
-    size_t left = sz;
-    while( left )
+    size_t readed = 0;
+    while( readed < sz )
     {
         size_t tomove;
         if( sd->cursor >= sd->inbuf )
         {
+/*
+            if( sd->eof )
+            {
+                sd->flags |= _SOCKET_EOF;
+                sd->error = EPIPE;
+                break;
+            }
+*/
             if( _knet_getbuf( sd ) == -1 ) return 0;
         }
-        tomove =
-                sd->inbuf - sd->cursor > left ? left : sd->inbuf - sd->cursor;
+        tomove = sz - readed;
+        if( tomove > sd->inbuf - sd->cursor ) tomove = sd->inbuf - sd->cursor;
         memcpy( buf, sd->buf + sd->cursor, tomove );
         buf += tomove;
-        left -= tomove;
+        readed += tomove;
         sd->cursor += tomove;
     }
-    return left ? 0 : sz;
+    return readed;
 }
 
 int knet_getc( ksocket sd )

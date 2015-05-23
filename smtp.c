@@ -16,18 +16,18 @@ static int smtp_answer( Smtp smtp )
     {
         int c;
         memset( buf, 0, sizeof(buf) );
-        if( !knet_read( &smtp->sd, buf, 4 ) )
+        if( knet_read( &smtp->sd, buf, 4 ) != 4 )
         {
-            smtpFormatError( smtp, "smtp_answer(): %s",
+            smtpFormatError( smtp, "smtp_answer(1): %s",
                     knet_error_msg( &smtp->sd ) );
             return 0;
         }
         scpyc( smtp->current, buf );
-        while( (c = knet_getc( &smtp->sd )) != '\n' && !knet_eof( &smtp->sd ) )
+        while( (c = knet_getc( &smtp->sd )) != '\n' && !smtp->sd.eof/*!knet_eof( &smtp->sd )*/ )
         {
             if( c == -1 )
             {
-                smtpFormatError( smtp, "smtp_answer(): %s",
+                smtpFormatError( smtp, "smtp_answer(2): %s",
                         knet_error_msg( &smtp->sd ) );
                 return 0;
             }
@@ -45,7 +45,7 @@ static int smtp_answer( Smtp smtp )
 static int smtp_write( Smtp smtp, const char * buf, size_t size )
 {
     knet_write( &smtp->sd, buf, size );
-    if( knet_error( &smtp->sd ) )
+    if( smtp->sd.error/*knet_error( &smtp->sd )*/ )
     {
         smtpFormatError( smtp, "smtp_write(): %s",
                 knet_error_msg( &smtp->sd ) );
