@@ -155,8 +155,11 @@ void knet_close( ksocket sd )
     {
         SSL_shutdown( sd->ssl );
         SSL_free( sd->ssl );
-        if( sd->ctx ) SSL_CTX_free( sd->ctx );
     }
+    if( sd->ctx ) SSL_CTX_free( sd->ctx );
+    sd->sock = -1;
+    sd->ssl = NULL;
+    sd->ctx = NULL;
 }
 
 static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )
@@ -425,6 +428,7 @@ static int _knet_getbuf( ksocket sd )
     if( rc == 0 )
     {
         sd->flags |= _SOCKET_EOF;
+        sd->error = EPIPE;
         return -1;
     }
     else if( rc == -1 )
