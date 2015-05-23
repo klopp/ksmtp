@@ -58,8 +58,7 @@ static int smtp_write( Smtp smtp, const char * buf )
     knet_write( &smtp->sd, buf, strlen( buf ) );
     if( smtp->sd.error/*knet_error( &smtp->sd )*/)
     {
-        smtpFormatError( smtp, "smtp_write(): %s",
-                knet_error( &smtp->sd ) );
+        smtpFormatError( smtp, "smtp_write(): %s", knet_error( &smtp->sd ) );
         return 0;
     }
     return 1;
@@ -255,7 +254,7 @@ int smtpSendMail( Smtp smtp )
     if( hash != smtp->hash )
     {
         knet_disconnect( &smtp->sd );
-        if( !smtpOpenSession( smtp) )
+        if( !smtpOpenSession( smtp ) )
         {
             scatc( smtp->error, " ## while re-calling smtpOpenSession()" );
             return 0;
@@ -310,8 +309,8 @@ int smtpOpenSession( Smtp smtp )
 
     if( !knet_connect( &smtp->sd, smtp->host, smtp->port ) )
     {
-        smtpFormatError( smtp, "Could not connect to %s:%d", smtp->host,
-                smtp->port );
+        smtpFormatError( smtp, "Could not connect to %s:%d (%s)", smtp->host,
+                smtp->port, knet_error( &smtp->sd ) );
         return 0;
     }
 
@@ -322,8 +321,8 @@ int smtpOpenSession( Smtp smtp )
         if( !smtp_start_tls( smtp ) || !knet_init_tls( &smtp->sd )
                 || !knet_verify_sert( &smtp->sd ) || !smtp_ehlo( smtp ) )
         {
-            smtpFormatError( smtp, "Could not initialize TLS for %s:%d",
-                    smtp->host, smtp->port );
+            smtpFormatError( smtp, "Could not initialize TLS for %s:%d (%s)",
+                    smtp->host, smtp->port, knet_error(&smtp->sd) );
             return 0;
         }
     }

@@ -21,21 +21,22 @@ int main( void )
             //"<img src=\"test.png\" />\n"
             "</body></html>";
 
-    Smtp smtp = smtpCreate(KSMTP_USE_TLS/*|KSMTP_VERBOSE_MSG*//*|KSMTP_VERBOSE_SMTP*/);
+    Smtp smtp = smtpCreate(
+            0|KSMTP_USE_TLS/*|KSMTP_VERBOSE_MSG*//*|KSMTP_VERBOSE_SMTP*/);
 
+/*
 #define USER        "vsevolod.lutovinov@ibic.se"
 #define PASSWORD    "0UnrsZvNYGby"
 #define HOST        "mail.ibic.se"
 #define TO          "Zazaza <klopp@yandex.ru>"
 #define PORT        2525
+*/
 
-    /*
      #define USER        "klopp@yandex.ru"
      #define PASSWORD    "easypass123"
      #define HOST        "smtp.yandex.com"
      #define TO          "vsevolod.lutovinov@ibic.se" // "Zazaza <klopp.spb@gmail.com>"
      #define PORT        25
-     */
 
     /*
      #define USER        "kloppsob@bk.ru"
@@ -83,13 +84,27 @@ int main( void )
 #ifndef __WINDOWS__
     signal( SIGPIPE, SIG_IGN );
 #endif
-    smtpOpenSession( smtp );
-    smtpSendMail( smtp );
-    smtpSetNodename( smtp, "klopp-local" );
-    smtpSendMail( smtp );
-    smtp->flags &= ~KSMTP_USE_TLS;
-    smtpSendMail( smtp );
-    smtpCloseSession( smtp );
+    if( !smtpOpenSession( smtp ) )
+    {
+        printf( "[%s]\n", smtpGetError(smtp) );
+    }
+    else
+    {
+        if( !smtpSendMail( smtp ) )
+        {
+            printf( "(%s)\n", smtpGetError(smtp) );
+        }
+        else
+        {
+            printf( "OK\n" );
+        }
+//    smtpSetNodename( smtp, "klopp-local" );
+//   smtpSendMail( smtp );
+//    smtp->flags &= ~KSMTP_USE_TLS;
+//    smtpSetPort( smtp, 26 );
+//    smtpSendMail( smtp );
+        smtpCloseSession( smtp );
+    }
     return smtpDestroy( smtp, 0 );
     /*
      if( !smtpSendOneMail( smtp ) )

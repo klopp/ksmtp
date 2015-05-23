@@ -11,6 +11,7 @@
 #include "../klib/config.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/types.h>
 
 #ifndef __WINDOWS__
@@ -42,6 +43,7 @@ typedef struct _ksocket
     int eof;
     int sock;
     int error;
+    int ssl_error;
     int inbuf;
     int cursor;
     char buf[SOCK_BUF_LEN];
@@ -57,6 +59,6 @@ int knet_write( ksocket sd, const char *buf, size_t size );
 int knet_getc( ksocket sd );
 int knet_verify_sert( ksocket sd );
 int knet_init_tls( ksocket sd );
-char * knet_error( ksocket sd );
+const char * knet_error( ksocket sd );
 
 #endif /* KNET_H_ */

@@ -7,8 +7,40 @@
 
 #include "knet.h"
 
-char * knet_error( ksocket sd )
+static const char * _knet_ssl_error( int err )
 {
+    static char _ssl_err_buf[64];
+    switch( err )
+    {
+        case SSL_ERROR_NONE:
+            return "SSL_ERROR_NONE";
+        case SSL_ERROR_WANT_READ:
+            return "SSL_ERROR_WANT_READ";
+        case SSL_ERROR_WANT_WRITE:
+            return "SSL_ERROR_WANT_WRITE";
+        case SSL_ERROR_ZERO_RETURN:
+            return "SSL_ERROR_ZERO_RETURN";
+        case SSL_ERROR_WANT_CONNECT:
+            return "SSL_ERROR_WANT_CONNECT";
+        case SSL_ERROR_WANT_ACCEPT:
+            return "SSL_ERROR_WANT_ACCEPT";
+        case SSL_ERROR_WANT_X509_LOOKUP:
+            return "SSL_ERROR_WANT_X509_LOOKUP";
+        case SSL_ERROR_SYSCALL:
+            return "SSL_ERROR_SYSCALL";
+        case SSL_ERROR_SSL:
+            return "SSL_ERROR_SSL";
+        default:
+            break;
+    }
+    sprintf( _ssl_err_buf, "SSL_ERROR_UNKNOWN (%d)", err );
+    return _ssl_err_buf;
+}
+
+const char * knet_error( ksocket sd )
+{
+    if( sd->ssl && sd->ssl_error != SSL_ERROR_NONE ) return _knet_ssl_error(
+            sd->ssl_error );
     return strerror( sd->error );
 }
 
@@ -65,25 +97,49 @@ static void _knet_down( void )
 int knet_connect( ksocket sd, const char * host, int port )
 {
     struct sockaddr_in sa;
-    struct hostent * he = gethostbyname( host );
+    struct hostent * he;
+    struct timeval timeout;
+    fd_set fdread;
+    int rc;
 
     if( sd->sock >= 0 ) return 1;
+    sd->ssl_error = SSL_ERROR_NONE;
     if( !_knet_init() ) return 0;
 
     he = gethostbyname( host );
-    if( !he ) return 0;
+    if( !he )
+    {
+        sd->error = errno;
+        return 0;
+    }
 
     sd->sock = socket( PF_INET, SOCK_STREAM, 0 );
-    if( sd->sock > 0 )
+    timeout.tv_sec = sd->timeout;
+    timeout.tv_usec = 0;
+
+    if( sd->sock > 0 && fcntl( sd->sock, F_SETFL, O_NONBLOCK ) >= 0
+            && setsockopt( sd->sock, SOL_SOCKET, SO_SNDTIMEO,
+                    (const void*)&timeout, sizeof(timeout) ) == 0 )
     {
         memset( &sa, 0, sizeof(sa) );
         sa.sin_family = PF_INET;
         sa.sin_port = htons( port );
         memcpy( &sa.sin_addr.s_addr, he->h_addr_list[0],
                 sizeof(sa.sin_addr.s_addr) );
-        if( connect( sd->sock, (struct sockaddr *)&sa, sizeof(sa) ) >= 0 )
+        while( 1 )
         {
-            return 1;
+            FD_ZERO( &fdread );
+            FD_SET( sd->sock, &fdread );
+            if( (rc = select( sd->sock + 1, NULL, &fdread, NULL, &timeout ))
+                    <= 0 )
+            {
+                sd->error = EPIPE;
+                break;
+            }
+            if( connect( sd->sock, (struct sockaddr *)&sa, sizeof(sa) ) >= 0 )
+            {
+                return 1;
+            }
         }
 #if defined(_MSC_VER)
         closesocket( sd->sock );
@@ -92,14 +148,24 @@ int knet_connect( ksocket sd, const char * host, int port )
 #endif
         sd->sock = -1;
     }
+    sd->error = errno == EINPROGRESS ? ETIME : errno;
     return 0;
 }
 
 int knet_init_tls( ksocket sd )
 {
+    struct timeval timeout;
+    fd_set fdread, fdwrite;
+    int rc;
+
+    sd->ssl_error = SSL_ERROR_NONE;
     _rand_seed();
     SSL_load_error_strings();
-    if( SSL_library_init() == -1 ) return 0;
+    if( SSL_library_init() == -1 )
+    {
+        sd->ssl_error = SSL_ERROR_SSL;
+        return 0;
+    }
 #ifndef __WINDOWS__
     sd->ctx = SSL_CTX_new( TLSv1_client_method() );
 #else
@@ -111,19 +177,49 @@ int knet_init_tls( ksocket sd )
     {
         SSL_CTX_free( sd->ctx );
         sd->ctx = NULL;
+        sd->ssl_error = SSL_ERROR_SSL;
         return 0;
     }
     SSL_set_fd( sd->ssl, sd->sock );
     SSL_set_mode( sd->ssl, SSL_MODE_AUTO_RETRY );
-    if( SSL_connect( sd->ssl ) == -1 )
+
+    timeout.tv_sec = sd->timeout;
+    timeout.tv_usec = 0;
+
+    while( 1 )
     {
-        SSL_CTX_free( sd->ctx );
-        SSL_free( sd->ssl );
-        sd->ssl = NULL;
-        sd->ctx = NULL;
-        return 0;
+        FD_ZERO( &fdwrite );
+        FD_ZERO( &fdread );
+        FD_SET( sd->sock, &fdwrite );
+        FD_SET( sd->sock, &fdread );
+
+        if( (rc = select( sd->sock + 1, NULL, &fdread, &fdwrite, &timeout ))
+                < 0 ) break;
+        if( rc == 0 ) continue;
+        if( !FD_ISSET( sd->sock, &fdwrite ) && !FD_ISSET( sd->sock, &fdread ) ) continue;
+        rc = SSL_connect( sd->ssl );
+
+        switch( (rc = SSL_get_error( sd->ssl, rc )) )
+        {
+            case SSL_ERROR_NONE:
+                return 1;
+
+            case SSL_ERROR_WANT_READ:
+                break;
+            case SSL_ERROR_WANT_WRITE:
+                break;
+
+            default:
+                SSL_shutdown( sd->ssl );
+                SSL_free( sd->ssl );
+                SSL_CTX_free( sd->ctx );
+                sd->ctx = NULL;
+                sd->ssl = NULL;
+                sd->ssl_error = rc;
+                return 0;
+        }
     }
-    return 1;
+    return 0;
 }
 
 int knet_verify_sert( ksocket sd )
@@ -171,7 +267,6 @@ static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )
     {
         if( time( NULL ) > to )
         {
-            /*sd->flags |= _SOCKET_ERROR;*/
             sd->error = EPIPE;
             return -1;
         }
@@ -181,16 +276,12 @@ static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )
         if( (rc = select( sd->sock + 1, NULL, &fdwrite, NULL, &timeout ))
                 == -1 )
         {
-            /*sd->flags |= _SOCKET_ERROR;*/
-            sd->error = errno;
+            sd->error = errno == EINPROGRESS ? ETIME : errno;
             return -1;
         }
         if( rc == 0 )
         {
             continue;
-            //sd->flags |= _SOCKET_ERROR;
-            //sd->error = EPIPE;
-            //break;
         }
 
         if( FD_ISSET( sd->sock, &fdwrite ) )
@@ -198,8 +289,7 @@ static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )
             rc = send( sd->sock, buf, left, 0 );
             if( rc == -1 || rc == 0 )
             {
-                /*sd->flags |= _SOCKET_ERROR;*/
-                sd->error = errno;
+                sd->error = errno == EINPROGRESS ? ETIME : errno;
                 return -1;
             }
             left -= rc;
@@ -217,17 +307,18 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
     fd_set fdread;
     struct timeval timeout;
     int write_blocked_on_read = 0;
+            int ssl_err = 0;
     time_t to = time( NULL ) + sd->timeout;
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
 
+    sd->ssl_error = SSL_ERROR_NONE;
     while( left )
     {
         if( time( NULL ) > to )
         {
-            /*sd->flags |= _SOCKET_ERROR;*/
-            sd->error = EPIPE;
+            sd->error = ETIME;
             return -1;
         }
 
@@ -243,17 +334,13 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
         if( (rc = select( sd->sock + 1, &fdread, &fdwrite, NULL, &timeout ))
                 < 0 )
         {
-            /*sd->flags |= _SOCKET_ERROR;*/
-            sd->error = errno;
+            sd->error = errno == EINPROGRESS ? ETIME : errno;
             return -1;
         }
 
         if( rc == 0 )
         {
             continue;
-            //sd->flags |= _SOCKET_ERROR;
-            //sd->error = EPIPE;
-            //return -1;
         }
 
         if( FD_ISSET( sd->sock, &fdwrite )
@@ -263,7 +350,7 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
 
             rc = SSL_write( sd->ssl, buf, left );
 
-            switch( SSL_get_error( sd->ssl, rc ) )
+            switch( (ssl_err = SSL_get_error( sd->ssl, rc )) )
             {
                 case SSL_ERROR_NONE:
                     left -= rc;
@@ -278,8 +365,8 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
                     break;
 
                 default:
-                    /*sd->flags |= _SOCKET_ERROR;*/
-                    sd->error = errno;
+                    sd->error = errno == EINPROGRESS ? ETIME : errno;
+                    sd->ssl_error = ssl_err;
                     return -1;
             }
 
@@ -307,13 +394,13 @@ static int _knet_read_ssl( ksocket sd )
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
+    sd->ssl_error = SSL_ERROR_NONE;
 
     while( !bFinish )
     {
         if( time( NULL ) > to )
         {
-            /*sd->flags |= _SOCKET_ERROR;*/
-            sd->error = EPIPE;
+            sd->error = ETIME;
             return -1;
         }
         FD_ZERO( &fdread );
@@ -328,20 +415,10 @@ static int _knet_read_ssl( ksocket sd )
         if( (rc = select( sd->sock + 1, &fdread, &fdwrite, NULL, &timeout ))
                 < 0 )
         {
-            /*sd->flags |= _SOCKET_ERROR;*/
-            sd->error = errno;
+            sd->error = errno == EINPROGRESS ? ETIME : errno;
             return -1;
         }
-        if( rc == 0 )
-        {
-            return 0;
-/*
-            sd->flags |= _SOCKET_ERROR;
-            sd->error = EPIPE;
-            return -1;
-*/
-
-        }
+        if( rc == 0 ) break;
 
         if( FD_ISSET( sd->sock, &fdread )
                 || (read_blocked_on_write && FD_ISSET( sd->sock, &fdwrite )) )
@@ -350,7 +427,6 @@ static int _knet_read_ssl( ksocket sd )
             {
                 if( time( NULL ) > to )
                 {
-                    /*sd->flags |= _SOCKET_ERROR;*/
                     sd->error = EPIPE;
                     return -1;
                 }
@@ -385,8 +461,8 @@ static int _knet_read_ssl( ksocket sd )
                 }
                 else
                 {
-                    /*sd->flags |= _SOCKET_ERROR;*/
-                    sd->error = errno;
+                    sd->error = errno == EINPROGRESS ? ETIME : errno;
+                    sd->ssl_error = ssl_err;
                     return -1;
                 }
             }
@@ -407,12 +483,22 @@ static int _knet_read_socket( ksocket sd )
     FD_ZERO( &fdread );
     FD_SET( sd->sock, &fdread );
 
-    if( (rc = select( sd->sock + 1, &fdread, NULL, NULL, &timeout )) < 0 ) return -1;
+    if( (rc = select( sd->sock + 1, &fdread, NULL, NULL, &timeout )) < 0 )
+    {
+        sd->error = errno == EINPROGRESS ? ETIME : errno;
+        return -1;
+    }
 
     if( FD_ISSET( sd->sock, &fdread ) )
     {
         rc = recv( sd->sock, sd->buf, SOCK_BUF_LEN, 0 );
+        if( rc < 0 )
+        {
+            sd->error = errno == EINPROGRESS ? ETIME : errno;
+            return -1;
+        }
     }
+
     return rc;
 }
 
@@ -420,21 +506,17 @@ static int _knet_getbuf( ksocket sd )
 {
     int rc;
     sd->eof = 0;
-    /*sd->flags = 0;*/
     sd->error = 0;
     sd->inbuf = sd->cursor = 0;
     memset( sd->buf, 0, SOCK_BUF_LEN );
     rc = sd->ssl ? _knet_read_ssl( sd ) : _knet_read_socket( sd );
     if( rc == 0 )
     {
-        /*sd->flags |= _SOCKET_EOF;*/
         sd->eof = 1;
-        /*sd->error = EPIPE;*/
         return -1;
     }
     else if( rc == -1 )
     {
-        /*sd->flags |= _SOCKET_ERROR;*/
         sd->error = errno;
         return -1;
     }
@@ -454,14 +536,6 @@ int knet_read( ksocket sd, char * buf, size_t sz )
         size_t tomove;
         if( sd->cursor >= sd->inbuf )
         {
-/*
-            if( sd->eof )
-            {
-                sd->flags |= _SOCKET_EOF;
-                sd->error = EPIPE;
-                break;
-            }
-*/
             if( _knet_getbuf( sd ) == -1 ) return 0;
         }
         tomove = sz - readed;
