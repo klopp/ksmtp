@@ -21,21 +21,21 @@ int main( void )
             //"<img src=\"test.png\" />\n"
             "</body></html>";
 
-    Smtp smtp = smtpCreate( /*KSMTP_USE_TLS| */ /*KSMTP_VERBOSE_MSG|*/KSMTP_VERBOSE_SMTP );
+    Smtp smtp = smtpCreate(KSMTP_USE_TLS/*|KSMTP_VERBOSE_MSG*//*|KSMTP_VERBOSE_SMTP*/);
 
-     #define USER        "vsevolod.lutovinov@ibic.se"
-     #define PASSWORD    "0UnrsZvNYGby"
-     #define HOST        "mail.ibic.se"
-     #define TO          "Zazaza <klopp@yandex.ru>"
-     #define PORT        2525
+#define USER        "vsevolod.lutovinov@ibic.se"
+#define PASSWORD    "0UnrsZvNYGby"
+#define HOST        "mail.ibic.se"
+#define TO          "Zazaza <klopp@yandex.ru>"
+#define PORT        2525
 
-/*
-#define USER        "klopp@yandex.ru"
-#define PASSWORD    "easypass123"
-#define HOST        "smtp.yandex.com"
-#define TO          "vsevolod.lutovinov@ibic.se" // "Zazaza <klopp.spb@gmail.com>"
-#define PORT        25
-*/
+    /*
+     #define USER        "klopp@yandex.ru"
+     #define PASSWORD    "easypass123"
+     #define HOST        "smtp.yandex.com"
+     #define TO          "vsevolod.lutovinov@ibic.se" // "Zazaza <klopp.spb@gmail.com>"
+     #define PORT        25
+     */
 
     /*
      #define USER        "kloppsob@bk.ru"
@@ -83,12 +83,22 @@ int main( void )
 #ifndef __WINDOWS__
     signal( SIGPIPE, SIG_IGN );
 #endif
-    if( !smtpSendOneMail( smtp ) )
-    {
-        printf( "ERROR %s\n", smtpGetError( smtp ) );
-        return smtpDestroy( smtp, 1 );
-    }
-    printf( "Sent OK\n" );
+    smtpOpenSession( smtp );
+    smtpSendMail( smtp );
+    smtpSetNodename( smtp, "klopp-local" );
+    smtpSendMail( smtp );
+    smtp->flags &= ~KSMTP_USE_TLS;
+    smtpSendMail( smtp );
+    smtpCloseSession( smtp );
     return smtpDestroy( smtp, 0 );
+    /*
+     if( !smtpSendOneMail( smtp ) )
+     {
+     printf( "ERROR %s\n", smtpGetError( smtp ) );
+     return smtpDestroy( smtp, 1 );
+     }
+     printf( "Sent OK\n" );
+     return smtpDestroy( smtp, 0 );
+     */
 }
 

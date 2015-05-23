@@ -212,15 +212,55 @@ int smtp_end_data( Smtp smtp )
     return smtp_cmd( smtp, "\r\n.\r\n", 250, 0 );
 }
 
+static unsigned _hash( unsigned prev, const char * buf, size_t size )
+{
+    unsigned hash;
+
+    for( hash = prev; size; buf++, size-- )
+    {
+        hash += (unsigned)*buf;
+        hash += (hash << 10);
+        hash ^= (hash >> 6);
+    }
+    hash += (hash << 3);
+    hash ^= (hash >> 11);
+    hash += (hash << 15);
+    return hash;
+}
+
+static unsigned _smtpHash( Smtp smtp )
+{
+    char tls = smtp->flags & KSMTP_USE_TLS;
+    unsigned hash = _hash( 0, smtp->smtp_user, strlen( smtp->smtp_user ) );
+    hash = _hash( hash, smtp->smtp_password, strlen( smtp->smtp_password ) );
+    hash = _hash( hash, smtp->host, strlen( smtp->host ) );
+    hash = _hash( hash, (char *)&smtp->port, sizeof(smtp->port) );
+    hash = _hash( hash, smtp->nodename, strlen( smtp->nodename ) );
+    hash = _hash( hash, (char *)&smtp->smtp_auth, sizeof(smtp->smtp_auth) );
+    hash = _hash( hash, &tls, sizeof(tls) );
+    return hash;
+}
+
 void smtpCloseSession( Smtp smtp )
 {
     smtp_quit( smtp );
+    smtp->hash = 0;
 }
 
 int smtpSendMail( Smtp smtp )
 {
     int rc = 0;
-    string headers = createHeaders( smtp );
+    string headers;
+    unsigned hash = _smtpHash( smtp );
+    if( hash != smtp->hash )
+    {
+        knet_disconnect( &smtp->sd );
+        if( !smtpOpenSession( smtp) )
+        {
+            return 0;
+        }
+    }
+    headers = createHeaders( smtp );
     if( !headers ) return 0;
     rc = processMessage( smtp, headers );
     sdel( headers );
@@ -304,5 +344,6 @@ int smtpOpenSession( Smtp smtp )
             }
         }
     }
+    smtp->hash = _smtpHash( smtp );
     return 1;
 }

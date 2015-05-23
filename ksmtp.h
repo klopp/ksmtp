@@ -66,10 +66,8 @@ typedef enum _KsmtpFlags
 
 typedef struct _Smtp
 {
+    unsigned hash;
     KsmtpFlags flags;
-
-    int port;
-
     struct _ksocket sd;
     string error;
     string current;
@@ -85,6 +83,7 @@ typedef struct _Smtp
     char *smtp_user;
     AuthType smtp_auth;
     char *smtp_password;
+    int port;
     char *host;
 
     size_t lastid;
