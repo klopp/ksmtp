@@ -251,7 +251,7 @@ static int makeAddrList( Smtp smtp, const char * title, List list, string msg )
     {
         if( !makeAddr( smtp, a, msg ) ) return 0;
         a = (Addr)lnext( list );
-        if( !scatc( msg, a ? ", " : "\r\n" ) ) return 0;
+        if( !scatc( msg, a ? "," : "\r\n" ) ) return 0;
     }
     return 1;
 }

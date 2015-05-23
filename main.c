@@ -22,21 +22,21 @@ int main( void )
             "</body></html>";
 
     Smtp smtp = smtpCreate(
-            0|KSMTP_USE_TLS/*|KSMTP_VERBOSE_MSG*//*|KSMTP_VERBOSE_SMTP*/);
+            0 | KSMTP_USE_TLS | KSMTP_VERBOSE_MSG | KSMTP_VERBOSE_SMTP );
 
-/*
-#define USER        "vsevolod.lutovinov@ibic.se"
-#define PASSWORD    "0UnrsZvNYGby"
-#define HOST        "mail.ibic.se"
-#define TO          "Zazaza <klopp@yandex.ru>"
-#define PORT        2525
-*/
+    /*
+     #define USER        "vsevolod.lutovinov@ibic.se"
+     #define PASSWORD    "0UnrsZvNYGby"
+     #define HOST        "mail.ibic.se"
+     #define TO          "Zazaza <klopp@yandex.ru>"
+     #define PORT        2525
+     */
 
-     #define USER        "klopp@yandex.ru"
-     #define PASSWORD    "easypass123"
-     #define HOST        "smtp.yandex.com"
-     #define TO          "vsevolod.lutovinov@ibic.se" // "Zazaza <klopp.spb@gmail.com>"
-     #define PORT        25
+#define USER        "klopp@yandex.ru"
+#define PASSWORD    "easypass123"
+#define HOST        "smtp.yandex.com"
+#define TO          "vsevolod.lutovinov@ibic.se" // "Zazaza <klopp.spb@gmail.com>"
+#define PORT        25
 
     /*
      #define USER        "kloppsob@bk.ru"
@@ -55,6 +55,7 @@ int main( void )
     smtpSetLogin( smtp, USER );
 
     smtpAddTo( smtp, TO );
+    smtpAddTo( smtp, "v@ato.su" );
     smtpSetSubject( smtp,
             "А вот как насчёт такого очень-очень-очень офигенно длинного поля сабжект?" );
     //smtpSetSubject( smtp, "А вот как насчёт?" );
@@ -67,32 +68,29 @@ int main( void )
     smtpAddHeader( smtp, "X-Custom-Two", "Two" );
 
 #ifndef __WINDOWS__
-    smtpEmbedFile( smtp, "/home/klopp/tmp/1.png", NULL );
-    smtpAttachFile( smtp, "/home/klopp/tmp/test.png", NULL );
+//    smtpEmbedFile( smtp, "/home/klopp/tmp/1.png", NULL );
+//    smtpAttachFile( smtp, "/home/klopp/tmp/test.png", NULL );
 #else
     smtpEmbedFile( smtp, "/tmp/0.png", NULL );
     smtpAttachFile( smtp, "/tmp/0.png", NULL );
 #endif
 
-    /*
-     signal(SIGTERM, properExit);
-     signal(SIGINT, properExit);
-     signal(SIGPIPE, properExit);
-     signal(SIGHUP, properExit);
-     signal(SIGQUIT, properExit);
-     */
+    signal( SIGTERM, SIG_IGN );
+    signal( SIGINT, SIG_IGN );
+    signal( SIGHUP, SIG_IGN );
+    signal( SIGQUIT, SIG_IGN );
 #ifndef __WINDOWS__
     signal( SIGPIPE, SIG_IGN );
 #endif
     if( !smtpOpenSession( smtp ) )
     {
-        printf( "[%s]\n", smtpGetError(smtp) );
+        printf( "[%s]\n", smtpGetError( smtp ) );
     }
     else
     {
         if( !smtpSendMail( smtp ) )
         {
-            printf( "(%s)\n", smtpGetError(smtp) );
+            printf( "(%s)\n", smtpGetError( smtp ) );
         }
         else
         {

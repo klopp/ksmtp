@@ -529,10 +529,12 @@ static int _knet_getbuf( ksocket sd )
         return -1;
     }
     sd->inbuf = rc;
+/*
     if( rc < SOCK_BUF_LEN )
     {
-        /*sd->eof = 1;*/
+        sd->eof = 1;
     }
+*/
     return rc;
 }
 
