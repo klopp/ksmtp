@@ -8,8 +8,7 @@
 #ifndef KSMTP_H_
 #define KSMTP_H_
 
-#include "../klib/config.h"
-#include "../lists/list.h"
+#include "../klib/list.h"
 #include "../stringlib/stringlib.h"
 
 #include "knet.h"

@@ -91,8 +91,8 @@ int main( void )
 #endif
     if( !smtpSendOneMail( smtp ) )
     {
-        knet_down();
         printf( "ERROR %s\n", smtpGetError( smtp ) );
+        knet_down();
         return smtpDestroy( smtp, 1 );
     }
     printf( "Sent OK\n" );
