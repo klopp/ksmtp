@@ -258,18 +258,20 @@ static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )
     size_t left = sz;
     fd_set fdwrite;
     struct timeval timeout;
-    time_t to = sd->timeout + time( NULL );
+    /*time_t to = sd->timeout + time( NULL );*/
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
 
     while( left )
     {
+/*
         if( time( NULL ) > to )
         {
             sd->error = EPIPE;
             return -1;
         }
+*/
         FD_ZERO( &fdwrite );
         FD_SET( sd->sock, &fdwrite );
 
@@ -308,7 +310,7 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
     struct timeval timeout;
     int write_blocked_on_read = 0;
             int ssl_err = 0;
-    time_t to = time( NULL ) + sd->timeout;
+    /*time_t to = time( NULL ) + sd->timeout;*/
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
@@ -316,11 +318,13 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
     sd->ssl_error = SSL_ERROR_NONE;
     while( left )
     {
+/*
         if( time( NULL ) > to )
         {
             sd->error = ETIME;
             return -1;
         }
+*/
 
         FD_ZERO( &fdwrite );
         FD_ZERO( &fdread );
@@ -390,7 +394,7 @@ static int _knet_read_ssl( ksocket sd )
     struct timeval timeout;
     int read_blocked_on_write = 0;
     int bFinish = 0;
-    time_t to = time( NULL ) + sd->timeout;
+    /*time_t to = time( NULL ) + sd->timeout;*/
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
@@ -398,11 +402,13 @@ static int _knet_read_ssl( ksocket sd )
 
     while( !bFinish )
     {
+/*
         if( time( NULL ) > to )
         {
             sd->error = ETIME;
             return -1;
         }
+*/
         FD_ZERO( &fdread );
         FD_ZERO( &fdwrite );
         FD_SET( sd->sock, &fdread );
@@ -425,11 +431,13 @@ static int _knet_read_ssl( ksocket sd )
         {
             while( 1 )
             {
+/*
                 if( time( NULL ) > to )
                 {
                     sd->error = EPIPE;
                     return -1;
                 }
+*/
                 read_blocked_on_write = 0;
 
                 rc = SSL_read( sd->ssl, sd->buf + readed,
