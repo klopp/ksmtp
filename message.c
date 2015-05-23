@@ -319,14 +319,27 @@ static int insertOneFile( Smtp smtp, const char * boundary, const char * name,
         smtpFormatError( smtp, "attachFile(\"%s\"), internal error 2", name );
         return 0;
     }
-    if( !sprint( out, "\r\n--%s\r\n"
-            "Content-Transfer-Encoding: base64\r\n"
-            "Content-Type: %s; name=\"%s\"\r\n"
-            "Content-Disposition: %s; filename=\"%s\"\r\n"
-            "%s%s%s"
-            "\r\n", boundary, mime_type, sstr( mime_name ), disposition,
-            sstr( mime_name ), cid ? "Content-ID: <" : "", cid ? cid : "",
-            cid ? ">\r\n" : "" ) )
+    /*
+     if( !sprint( out, "\r\n--%s\r\n"
+     "Content-Transfer-Encoding: base64\r\n"
+     "Content-Type: %s; name=\"%s\"\r\n"
+     "Content-Disposition: %s; filename=\"%s\"\r\n"
+     "%s%s%s"
+     "\r\n", boundary, mime_type, sstr( mime_name ), disposition,
+     sstr( mime_name ), cid ? "Content-ID: <" : "", cid ? cid : "",
+     cid ? ">\r\n" : "" ) )
+     */
+    if( !scpyc( out, "\r\n--" ) || !scatc( out, boundary )
+            || !scatc( out,
+                    "\r\nContent-Transfer-Encoding: base64\r\nContent-Type: " )
+            || !scatc( out, mime_type ) || !scatc( out, "; name=\"" )
+            || !scatc( out, sstr( mime_name ) )
+            || !scatc( out, "\"\r\nContent-Disposition: " )
+            || !scatc( out, disposition ) || !scatc( out, "; filename=\"" )
+            || !scatc( out, sstr( mime_name ) ) || !scatc( out, "\"\r\n" )
+            || !scatc( out, cid ? "Content-ID: <" : "" )
+            || !scatc( out, cid ? cid : "" )
+            || !scatc( out, cid ? ">\r\n" : "" ) || !scatc( out, "\r\n" ) )
     {
         fclose( f );
         sdel( mime_name );
