@@ -7,19 +7,7 @@
 
 #include "knet.h"
 
-/*
- int knet_error( ksocket sd )
- {
- return sd->flags & _SOCKET_ERROR;
- }
-
- int knet_eof( ksocket sd )
- {
- return sd->flags & _SOCKET_EOF;
- }
-
- */
-char * knet_error_msg( ksocket sd )
+char * knet_error( ksocket sd )
 {
     return strerror( sd->error );
 }
@@ -49,7 +37,7 @@ static void _rand_seed( void )
     RAND_seed( &data, sizeof(data) );
 }
 
-int knet_init( void )
+static int _knet_init( void )
 {
 #if defined(__WINDOWS__)
     WSADATA wsaData;
@@ -67,7 +55,7 @@ int knet_init( void )
     return 1;
 }
 
-void knet_down( void )
+static void _knet_down( void )
 {
 #if defined(__WINDOWS__)
     WSACleanup();
@@ -78,7 +66,12 @@ int knet_connect( ksocket sd, const char * host, int port )
 {
     struct sockaddr_in sa;
     struct hostent * he = gethostbyname( host );
-    if( !he ) return 1;
+
+    if( sd->sock >= 0 ) return 1;
+    if( !_knet_init() ) return 0;
+
+    he = gethostbyname( host );
+    if( !he ) return 0;
 
     sd->sock = socket( PF_INET, SOCK_STREAM, 0 );
     if( sd->sock > 0 )
@@ -141,7 +134,7 @@ int knet_verify_sert( ksocket sd )
     return 1;
 }
 
-void knet_close( ksocket sd )
+void knet_disconnect( ksocket sd )
 {
     if( sd->sock >= 0 )
     {
@@ -160,6 +153,7 @@ void knet_close( ksocket sd )
     sd->sock = -1;
     sd->ssl = NULL;
     sd->ctx = NULL;
+    _knet_down();
 }
 
 static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )

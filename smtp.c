@@ -19,7 +19,7 @@ static int smtp_answer( Smtp smtp )
         if( knet_read( &smtp->sd, buf, 4 ) != 4 )
         {
             smtpFormatError( smtp, "smtp_answer(1): %s",
-                    knet_error_msg( &smtp->sd ) );
+                    knet_error( &smtp->sd ) );
             return 0;
         }
         scpyc( smtp->current, buf );
@@ -28,7 +28,7 @@ static int smtp_answer( Smtp smtp )
             if( c == -1 )
             {
                 smtpFormatError( smtp, "smtp_answer(2): %s",
-                        knet_error_msg( &smtp->sd ) );
+                        knet_error( &smtp->sd ) );
                 return 0;
             }
             else
@@ -59,7 +59,7 @@ static int smtp_write( Smtp smtp, const char * buf )
     if( smtp->sd.error/*knet_error( &smtp->sd )*/)
     {
         smtpFormatError( smtp, "smtp_write(): %s",
-                knet_error_msg( &smtp->sd ) );
+                knet_error( &smtp->sd ) );
         return 0;
     }
     return 1;

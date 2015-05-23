@@ -34,13 +34,6 @@
 #endif
 #endif
 
-/*
-enum
-{
-    _SOCKET_ERROR = 0x01, _SOCKET_EOF = 0x02
-};
-*/
-
 #define SOCK_BUF_LEN  4096
 
 typedef struct _ksocket
@@ -56,19 +49,14 @@ typedef struct _ksocket
     SSL *ssl;
 } *ksocket;
 
-int knet_init( void );
-void knet_down( void );
 int knet_connect( ksocket sd, const char * host, int port );
+void knet_disconnect( ksocket sd );
+
 int knet_read( ksocket sd, char *buf, size_t size );
 int knet_write( ksocket sd, const char *buf, size_t size );
 int knet_getc( ksocket sd );
 int knet_verify_sert( ksocket sd );
-void knet_close( ksocket sd );
 int knet_init_tls( ksocket sd );
-char * knet_error_msg( ksocket sd );
-/*
-int knet_error( ksocket sd );
-int knet_eof( ksocket sd );
-*/
+char * knet_error( ksocket sd );
 
 #endif /* KNET_H_ */

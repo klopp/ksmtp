@@ -85,12 +85,13 @@ Smtp smtpCreate( KsmtpFlags flags )
         return smtp;
     }
 
-    return (Smtp)smtpDestroy( smtp, 0 );
+    smtpDestroy( smtp, 0 );
+    return NULL;
 }
 
 int smtpDestroy( Smtp smtp, int sig )
 {
-    knet_close( &smtp->sd );
+    knet_disconnect( &smtp->sd );
 
     ldestroy( smtp->parts );
     ldestroy( smtp->afiles );

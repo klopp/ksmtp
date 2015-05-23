@@ -73,12 +73,6 @@ int main( void )
     smtpAttachFile( smtp, "/tmp/0.png", NULL );
 #endif
 
-    if( !knet_init() )
-    {
-        printf( "Can not init socket library!\n" );
-        return smtpDestroy( smtp, 1 );
-    }
-
     /*
      signal(SIGTERM, properExit);
      signal(SIGINT, properExit);
@@ -92,11 +86,9 @@ int main( void )
     if( !smtpSendOneMail( smtp ) )
     {
         printf( "ERROR %s\n", smtpGetError( smtp ) );
-        knet_down();
         return smtpDestroy( smtp, 1 );
     }
     printf( "Sent OK\n" );
-    knet_down();
     return smtpDestroy( smtp, 0 );
 }
 
