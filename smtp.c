@@ -257,6 +257,7 @@ int smtpSendMail( Smtp smtp )
         knet_disconnect( &smtp->sd );
         if( !smtpOpenSession( smtp) )
         {
+            scatc( smtp->error, " ## while re-calling smtpOpenSession()" );
             return 0;
         }
     }
