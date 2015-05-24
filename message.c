@@ -29,8 +29,7 @@ static string encodeb64( const char * prefix, const char * value )
             sdel( encoded );
             return NULL;
         }
-        if( !scatc( encoded, first ) || !scatc( encoded, prefix )
-                || !scat( encoded, b64 ) || !scatc( encoded, "?=" ) )
+        if( !xscatc( encoded, first, prefix, sstr( b64 ), "?=", NULL ) )
         {
             sdel( b64 );
             sdel( encoded );
@@ -57,7 +56,7 @@ static string encodeb64( const char * prefix, const char * value )
 static int makeEncodedHeader( Smtp smtp, const char * title, const char * value,
         string msg )
 {
-    if( !scatc( msg, title ) || !scatc( msg, ": " ) ) return 0;
+    if( !xscatc( msg, title, ": ", NULL ) ) return 0;
 
     if( isUsAscii( value ) )
     {
@@ -133,7 +132,7 @@ static string makeTextParts( Smtp smtp )
     {
         mimeMakeBoundary( boundary );
         if( !scpyc( parts, "Content-Type: multipart/alternative; boundary=\"" )
-                || !scatc( parts, boundary ) || !scatc( parts, "\"\r\n\r\n" ) )
+                || !xscatc( parts, boundary, "\"\r\n\r\n", NULL ) )
         {
             sdel( parts );
             return NULL;
@@ -144,8 +143,8 @@ static string makeTextParts( Smtp smtp )
     {
         if( smtp->parts->size > 1 )
         {
-            if( !scatc( parts, "--" ) || !scatc( parts, boundary )
-                    || !scatc( parts, "\r\nContent-ID: text@part\r\n" ) )
+            if( !xscatc( parts, "--", boundary, "\r\nContent-ID: text@part\r\n",
+            NULL ) )
             {
                 rc = 0;
                 break;
@@ -154,14 +153,12 @@ static string makeTextParts( Smtp smtp )
         if( *part->cprefix )
         {
             string b64 = base64_sencode( part->body );
-            if( !b64 || !scatc( parts, "Content-Type: text/" )
-                    || !scatc( parts, part->ctype )
-                    || !scatc( parts, "; charset=" )
-                    || !scatc( parts, part->charset )
-                    || !scatc( parts, "\r\nContent-Disposition: inline\r\n"
-                            "Content-Transfer-Encoding: base64\r\n\r\n" )
-                    || !scatc( parts, sstr( b64 ) )
-                    || !scatc( parts, "\r\n\r\n" ) )
+            if( !b64
+                    || !xscatc( parts, "Content-Type: text/", part->ctype,
+                            "; charset=", part->charset,
+                            "\r\nContent-Disposition: inline\r\n"
+                                    "Content-Transfer-Encoding: base64\r\n\r\n",
+                            sstr( b64 ), "\r\n\r\n", NULL ) )
             {
                 sdel( b64 );
                 rc = 0;
@@ -171,13 +168,9 @@ static string makeTextParts( Smtp smtp )
         }
         else
         {
-            if( !scatc( parts, "Content-Type: text/" )
-                    || !scatc( parts, part->ctype )
-                    || !scatc( parts, "; charset=" )
-                    || !scatc( parts, part->charset )
-                    || !scatc( parts, "\r\n\r\n" )
-                    || !scatc( parts, part->body )
-                    || !scatc( parts, "\r\n\r\n" ) )
+            if( !xscatc( parts, "Content-Type: text/", part->ctype,
+                    "; charset=", part->charset, "\r\n\r\n", part->body,
+                    "\r\n\r\n", NULL ) )
             {
                 rc = 0;
                 break;
@@ -189,8 +182,7 @@ static string makeTextParts( Smtp smtp )
     {
         if( smtp->parts->size > 1 )
         {
-            if( !scatc( parts, "--" ) || !scatc( parts, boundary )
-                    || !scatc( parts, "--\r\n" ) )
+            if( !xscatc( parts, "--", boundary, "--\r\n", NULL ) )
             {
                 rc = 0;
             }
@@ -210,8 +202,7 @@ static int makeOneAddr( Smtp smtp, const char * title, Addr a, string out )
     {
         string buf = makeEmail( smtp, a );
         if( !buf ) return 0;
-        if( !scatc( out, title ) || !scatc( out, ": " ) || !scat( out, buf )
-                || !scatc( out, "\r\n" ) )
+        if( !xscatc( out, title, ": ", buf, "\r\n", NULL ) )
         {
             sdel( buf );
             return 0;
@@ -244,7 +235,7 @@ static int makeAddrList( Smtp smtp, const char * title, List list, string msg )
     Addr a;
 
     if( !list || !list->size ) return 1;
-    if( !scatc( msg, title ) || !scatc( msg, ": " ) ) return 0;
+    if( !xscatc( msg, title, ": ", NULL ) ) return 0;
 
     a = (Addr)lfirst( list );
     while( a )
@@ -270,7 +261,7 @@ static int makeDateHeader( string msg )
 #endif
     strftime( buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", lt );
 
-    return scatc( msg, "Date: " ) && scatc( msg, buf ) && scatc( msg, "\r\n" );
+    return xscatc( msg, "Date: ", buf, "\r\n", NULL ) != NULL;
 }
 
 static int makeExtraHeaders( Smtp smtp, string msg )
@@ -498,8 +489,7 @@ int processMessage( Smtp smtp, string headers )
     {
         mimeMakeBoundary( r_boundary );
         related = sfromchar( "Content-Type: multipart/related; boundary=\"" );
-        if( !related || !scatc( related, r_boundary )
-                || !scatc( related, "\"\r\n\r\n" ) )
+        if( !related || !xscatc( related, r_boundary, "\"\r\n\r\n", NULL ) )
         {
             rc = 0;
             goto pmend;
@@ -510,8 +500,8 @@ int processMessage( Smtp smtp, string headers )
     {
         mimeMakeBoundary( mp_boundary );
         multipart = sfromchar( "Content-Type: multipart/mixed; boundary=\"" );
-        if( !multipart || !scatc( multipart, mp_boundary )
-                || !scatc( multipart, "\"\r\n\r\n" ) )
+        if( !multipart
+                || !xscatc( multipart, mp_boundary, "\"\r\n\r\n", NULL ) )
         {
             rc = 0;
             goto pmend;
