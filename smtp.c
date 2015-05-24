@@ -8,6 +8,7 @@
 #include "ksmtp.h"
 #include "message.h"
 #include "../stringlib/b64.h"
+#include "../klib/hash.h"
 
 static int smtp_answer( Smtp smtp )
 {
@@ -211,21 +212,7 @@ int smtp_end_data( Smtp smtp )
     return smtp_cmd( smtp, "\r\n.\r\n", 250, 0 );
 }
 
-static unsigned _hash( unsigned prev, const char * buf, size_t size )
-{
-    unsigned hash;
-
-    for( hash = prev; size; buf++, size-- )
-    {
-        hash += (unsigned)*buf;
-        hash += (hash << 10);
-        hash ^= (hash >> 6);
-    }
-    hash += (hash << 3);
-    hash ^= (hash >> 11);
-    hash += (hash << 15);
-    return hash;
-}
+#define _hash hash_rot13
 
 static unsigned _smtpHash( Smtp smtp )
 {
