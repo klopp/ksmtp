@@ -212,8 +212,12 @@ int smtp_end_data( Smtp smtp )
     return smtp_cmd( smtp, "\r\n.\r\n", 250, 0 );
 }
 
+<<<<<<< HEAD
 #define _shash  shash_rot13
 #define _hash   hash_rot13
+=======
+#define _hash hash_rot13
+>>>>>>> 94cbcb5d703501663e88184196bcd297428c5e56
 
 static unsigned _smtpHash( Smtp smtp )
 {
