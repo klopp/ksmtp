@@ -22,7 +22,7 @@ int main( void )
             "</body></html>";
 
     Smtp smtp = smtpCreate(
-            0 | KSMTP_USE_TLS | KSMTP_VERBOSE_MSG | KSMTP_VERBOSE_SMTP );
+            0 | KSMTP_USE_TLS /*| KSMTP_VERBOSE_MSG | KSMTP_VERBOSE_SMTP */);
 
     /*
      #define USER        "vsevolod.lutovinov@ibic.se"
@@ -103,6 +103,9 @@ int main( void )
 //    smtpSendMail( smtp );
         smtpCloseSession( smtp );
     }
+
+    mp_dump( NULL, stdout, 70 );
+
     return smtpDestroy( smtp, 0 );
     /*
      if( !smtpSendOneMail( smtp ) )

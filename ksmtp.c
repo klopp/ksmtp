@@ -13,46 +13,46 @@
 static void delTextPart( void * ptr )
 {
     TextPart part = (TextPart)ptr;
-    free( part->body );
-    free( part->ctype );
-    free( part );
+    Free( part->body );
+    Free( part->ctype );
+    Free( part );
 }
 
 static void delAddr( void * ptr )
 {
     Addr addr = (Addr)ptr;
-    free( addr->name );
-    free( addr->email );
-    free( addr );
+    Free( addr->name );
+    Free( addr->email );
+    Free( addr );
 }
 
 static void delHeader( void * ptr )
 {
     Header header = (Header)ptr;
-    free( header->title );
-    free( header->value );
-    free( header );
+    Free( header->title );
+    Free( header->value );
+    Free( header );
 }
 
 static void delAFile( void *ptr )
 {
     AFile file = (AFile)ptr;
-    free( file->name );
-    free( file->ctype );
-    free( file );
+    Free( file->name );
+    Free( file->ctype );
+    Free( file );
 }
 
 static void delEFile( void *ptr )
 {
     EFile file = (EFile)ptr;
-    free( file->name );
-    free( file->ctype );
-    free( file );
+    Free( file->name );
+    Free( file->ctype );
+    Free( file );
 }
 
 Smtp smtpCreate( KsmtpFlags flags )
 {
-    Smtp smtp = (Smtp)calloc( sizeof(struct _Smtp), 1 );
+    Smtp smtp = (Smtp)Calloc( sizeof(struct _Smtp), 1 );
     if( !smtp ) return NULL;
 
     smtp->flags = flags;
@@ -71,8 +71,8 @@ Smtp smtpCreate( KsmtpFlags flags )
     smtp->to = lcreate( delAddr );
     smtp->headers = lcreate( delHeader );
 
-    smtp->replyto = calloc( sizeof(struct _Addr), 1 );
-    smtp->from = calloc( sizeof(struct _Addr), 1 );
+    smtp->replyto = Calloc( sizeof(struct _Addr), 1 );
+    smtp->from = Calloc( sizeof(struct _Addr), 1 );
 
     smtp->error = snew();
     smtp->current = snew();
@@ -107,13 +107,13 @@ int smtpDestroy( Smtp smtp, int sig )
     sdel( smtp->error );
     sdel( smtp->current );
 
-    free( smtp->subject );
-    free( smtp->xmailer );
-    free( smtp->host );
-    free( smtp->smtp_user );
-    free( smtp->smtp_password );
+    Free( smtp->subject );
+    Free( smtp->xmailer );
+    Free( smtp->host );
+    Free( smtp->smtp_user );
+    Free( smtp->smtp_password );
 
-    free( smtp );
+    Free( smtp );
     return sig;
 }
 
@@ -130,15 +130,15 @@ int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype,
         part = (TextPart)lnext( smtp->parts );
     }
 
-    part = malloc( sizeof(struct _TextPart) );
+    part = Malloc( sizeof(struct _TextPart) );
     if( !part ) return 0;
-    part->body = strdup( body );
+    part->body = Strdup( body );
     if( !part->body )
     {
-        free( part );
+        Free( part );
         return 0;
     }
-    part->ctype = strdup( ctype );
+    part->ctype = Strdup( ctype );
     if( !part->ctype )
     {
         delTextPart( part );
@@ -238,7 +238,7 @@ int smtpAddTo( Smtp smtp, const char * to )
     {
         if( !ladd( smtp->to, addr ) )
         {
-            free( addr );
+            Free( addr );
             return 0;
         }
     }
@@ -247,10 +247,10 @@ int smtpAddTo( Smtp smtp, const char * to )
 
 int smtpAddHeader( Smtp smtp, const char * key, const char * value )
 {
-    Header header = calloc( sizeof(struct _Header), 1 );
+    Header header = Calloc( sizeof(struct _Header), 1 );
     if( !header ) return 0;
-    header->title = strdup( key );
-    header->value = strdup( value );
+    header->title = Strdup( key );
+    header->value = Strdup( value );
     if( !header->value || !header->title )
     {
         delHeader( header );
@@ -276,17 +276,17 @@ void smtpClearHeaders( Smtp smtp )
 
 const char * smtpEmbedFile( Smtp smtp, const char * name, const char * ctype )
 {
-    EFile file = calloc( sizeof(struct _EFile), 1 );
+    EFile file = Calloc( sizeof(struct _EFile), 1 );
     if( !file ) return NULL;
-    file->name = strdup( name );
+    file->name = Strdup( name );
     if( !file->name )
     {
-        free( file );
+        Free( file );
         return NULL;
     }
     if( ctype )
     {
-        file->ctype = strdup( ctype );
+        file->ctype = Strdup( ctype );
         if( !file->ctype )
         {
             delEFile( file );
@@ -305,17 +305,17 @@ const char * smtpEmbedFile( Smtp smtp, const char * name, const char * ctype )
 
 int smtpAttachFile( Smtp smtp, const char * name, const char * ctype )
 {
-    AFile file = calloc( sizeof(struct _AFile), 1 );
+    AFile file = Calloc( sizeof(struct _AFile), 1 );
     if( !file ) return 0;
-    file->name = strdup( name );
+    file->name = Strdup( name );
     if( !file->name )
     {
-        free( file );
+        Free( file );
         return 0;
     }
     if( ctype )
     {
-        file->ctype = strdup( ctype );
+        file->ctype = Strdup( ctype );
         if( !file->ctype )
         {
             delAFile( file );
@@ -343,10 +343,10 @@ void smtpClearEFiles( Smtp smtp )
 
 int smtpSetSubject( Smtp smtp, const char * subj )
 {
-    char * s = strdup( subj );
+    char * s = Strdup( subj );
     if( s )
     {
-        free( smtp->subject );
+        Free( smtp->subject );
         smtp->subject = s;
         return 0;
     }
@@ -368,10 +368,10 @@ void smtpSetCharset( Smtp smtp, const char * charset )
 
 int smtpSetXmailer( Smtp smtp, const char * xmailer )
 {
-    char * x = strdup( xmailer );
+    char * x = Strdup( xmailer );
     if( x )
     {
-        free( smtp->xmailer );
+        Free( smtp->xmailer );
         smtp->xmailer = x;
         return 1;
     }
@@ -380,10 +380,10 @@ int smtpSetXmailer( Smtp smtp, const char * xmailer )
 
 int smtpSetLogin( Smtp smtp, const char * login )
 {
-    char * s = strdup( login );
+    char * s = Strdup( login );
     if( s )
     {
-        free( smtp->smtp_user );
+        Free( smtp->smtp_user );
         smtp->smtp_user = s;
         return 1;
     }
@@ -392,10 +392,10 @@ int smtpSetLogin( Smtp smtp, const char * login )
 
 int smtpSetPassword( Smtp smtp, const char * password )
 {
-    char * s = strdup( password );
+    char * s = Strdup( password );
     if( s )
     {
-        free( smtp->smtp_password );
+        Free( smtp->smtp_password );
         smtp->smtp_password = s;
         return 1;
     }
@@ -414,10 +414,10 @@ int smtpSetSMTP( Smtp smtp, const char * host, int port )
 
 int smtpSetHost( Smtp smtp, const char * server )
 {
-    char * h = strdup( server );
+    char * h = Strdup( server );
     if( h )
     {
-        free( smtp->host );
+        Free( smtp->host );
         smtp->host = h;
         return 1;
     }

@@ -61,7 +61,7 @@ char * mimeMakeBoundary( char * boundary )
 {
     if( !boundary )
     {
-        boundary = calloc( 33, 1 );
+        boundary = Malloc( 33 );
         if( !boundary ) return NULL;
     }
 
