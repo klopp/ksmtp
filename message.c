@@ -86,6 +86,10 @@ static string makeEmail( Smtp smtp, Addr a )
     {
         if( isUsAscii( a->name ) )
         {
+            /*
+             if( !scatc( buf, a->name ) || !scatc( buf, " <" )
+             || !scatc( buf, a->name ) || !scatc( buf, ">" ) )
+             */
             if( !sprint( buf, "%s <%s>", a->name, a->email ) )
             {
                 sdel( buf );
@@ -100,6 +104,11 @@ static string makeEmail( Smtp smtp, Addr a )
                 sdel( buf );
                 return NULL;
             }
+            /*
+             if( !scatc( buf, a->name ) || scatc( buf, sstr( b64 ) )
+             || !scatc( buf, a->name ) || !scatc( buf, ">" ) )
+             */
+
             if( !sprint( buf, "%s <%s>", sstr( b64 ), a->email ) )
             {
                 sdel( buf );
@@ -309,6 +318,7 @@ static int insertOneFile( Smtp smtp, const char * boundary, const char * name,
         smtpFormatError( smtp, "attachFile(\"%s\"), internal error 2", name );
         return 0;
     }
+
     if( !sprint( out, "\r\n--%s\r\n"
             "Content-Transfer-Encoding: base64\r\n"
             "Content-Type: %s; name=\"%s\"\r\n"
