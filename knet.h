@@ -24,6 +24,7 @@
 #include <openssl/x509.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
+#include <openssl/err.h>
 #include <netdb.h>
 #else
 #include <winsock2.h>
