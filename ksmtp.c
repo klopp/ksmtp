@@ -294,7 +294,7 @@ const char * smtpEmbedFile( Smtp smtp, const char * name, const char * ctype )
         }
     }
     smtp->lastid++;
-    sprintf( file->cid, "%s%d", KFILE_CONTENT_ID, smtp->lastid );
+    sprintf( file->cid, "%s%zu", KFILE_CONTENT_ID, smtp->lastid );
     if( !ladd( smtp->efiles, file ) )
     {
         delEFile( file );
