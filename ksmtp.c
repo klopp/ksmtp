@@ -61,7 +61,7 @@ Smtp smtpCreate( KsmtpFlags flags )
     smtp->sd.sock = -1;
     if( gethostname( smtp->nodename, sizeof(smtp->nodename) - 1 ) < 0 )
     {
-        strcpy( smtp->nodename, "localhost" );
+        strncpy( smtp->nodename, "localhost", sizeof(smtp->nodename) - 1 );
     }
     smtp->parts = lcreate( delTextPart );
     smtp->afiles = lcreate( delAFile );
