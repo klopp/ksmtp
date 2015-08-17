@@ -22,21 +22,21 @@ int main( void )
             "</body></html>";
 
     Smtp smtp = smtpCreate(
-            0 | KSMTP_USE_TLS /*| KSMTP_VERBOSE_MSG | KSMTP_VERBOSE_SMTP */);
+            0 | KSMTP_USE_TLS/*| KSMTP_VERBOSE_MSG | KSMTP_VERBOSE_SMTP */);
 
-    /*
-     #define USER        "vsevolod.lutovinov@ibic.se"
-     #define PASSWORD    "0UnrsZvNYGby"
-     #define HOST        "mail.ibic.se"
-     #define TO          "Zazaza <klopp@yandex.ru>"
-     #define PORT        2525
-     */
+/*
+#define USER        "vsevolod.lutovinov@ibic.se"
+#define PASSWORD    "0UnrsZvNYGby"
+#define HOST        "mail.ibic.se"
+#define TO          "Zazaza <klopp@yandex.ru>"
+#define PORT        2525
+*/
 
-#define USER        "klopp@yandex.ru"
-#define PASSWORD    "easypass123"
-#define HOST        "smtp.yandex.com"
-#define TO          "vsevolod.lutovinov@ibic.se" // "Zazaza <klopp.spb@gmail.com>"
-#define PORT        25
+     #define USER        "klopp@yandex.ru"
+     #define PASSWORD    "easypass123"
+     #define HOST        "smtp.yandex.com"
+     #define TO          "vsevolod.lutovinov@ibic.se" // "Zazaza <klopp.spb@gmail.com>"
+     #define PORT        25
 
     /*
      #define USER        "kloppsob@bk.ru"
@@ -104,7 +104,7 @@ int main( void )
         smtpCloseSession( smtp );
     }
 
-    mp_dump( NULL, stdout, 70 );
+    //mp_dump( NULL, stdout, 70 );
 
     return smtpDestroy( smtp, 0 );
     /*
