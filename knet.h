@@ -15,17 +15,17 @@
 #include <sys/types.h>
 
 #ifndef __WINDOWS__
-#include <sys/utsname.h>
+#include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <openssl/ssl.h>
-#include <openssl/crypto.h>
-#include <openssl/x509.h>
-#include <openssl/pem.h>
-#include <openssl/rand.h>
-#include <openssl/err.h>
 #include <netdb.h>
+#include <errno.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <openssl/ssl.h>
+#include <openssl/rand.h>
 #else
 #include <winsock2.h>
 #include <process.h>
@@ -50,7 +50,7 @@ typedef struct _ksocket
     char buf[SOCK_BUF_LEN];
     SSL_CTX *ctx;
     SSL *ssl;
-} *ksocket;
+}*ksocket;
 
 int knet_connect( ksocket sd, const char * host, int port );
 void knet_disconnect( ksocket sd );
@@ -61,5 +61,13 @@ int knet_getc( ksocket sd );
 int knet_verify_sert( ksocket sd );
 int knet_init_tls( ksocket sd );
 const char * knet_error( ksocket sd );
+
+#ifndef __WINDOWS__
+# define    closesocket         close
+# define    WSAGetLastError()   errno
+# define    WSAEWOULDBLOCK      EINPROGRESS
+# define    ioctlsocket         ioctl
+# define    SOCKET_ERROR        -1
+#endif
 
 #endif /* KNET_H_ */
