@@ -1,5 +1,4 @@
-# ksmtp
-Small SMTP library
+# Usage
 
 ```C
 Smtp smtp = smtpCreate( KSMTP_USE_TLS );
