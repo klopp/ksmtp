@@ -36,7 +36,7 @@
 #endif
 #endif
 
-#define SOCK_BUF_LEN  4096
+#define SOCK_BUF_LEN  (1024*16)
 
 typedef struct _ksocket
 {
