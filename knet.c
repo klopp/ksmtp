@@ -98,9 +98,12 @@ int knet_connect( ksocket sd, const char * host, int port )
 {
     struct sockaddr_in sa;
     struct hostent * he;
+/*
     struct timeval timeout;
-    fd_set fdread;
+    fd_set fdwrite, fdexcept;
     int rc;
+*/
+    unsigned long nonblock = 1;
 
     if( sd->sock >= 0 ) return 1;
     sd->ssl_error = SSL_ERROR_NONE;
@@ -109,47 +112,79 @@ int knet_connect( ksocket sd, const char * host, int port )
     he = gethostbyname( host );
     if( !he )
     {
-        sd->error = errno;
+        sd->error = WSAGetLastError();
         return 0;
     }
 
-    sd->sock = socket( PF_INET, SOCK_STREAM, 0 );
+/*
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
+*/
 
-    if( sd->sock > 0 && fcntl( sd->sock, F_SETFL, O_NONBLOCK ) >= 0
-            && setsockopt( sd->sock, SOL_SOCKET, SO_SNDTIMEO,
-                    (const void*)&timeout, sizeof(timeout) ) == 0 )
+    memset( &sa, 0, sizeof(sa) );
+    sa.sin_family = PF_INET;
+    sa.sin_port = htons( port );
+    memcpy( &sa.sin_addr.s_addr, he->h_addr_list[0],
+            sizeof(sa.sin_addr.s_addr) );
+
+    sd->sock = socket( PF_INET, SOCK_STREAM, 0 );
+    if( sd->sock < 0 )
     {
-        memset( &sa, 0, sizeof(sa) );
-        sa.sin_family = PF_INET;
-        sa.sin_port = htons( port );
-        memcpy( &sa.sin_addr.s_addr, he->h_addr_list[0],
-                sizeof(sa.sin_addr.s_addr) );
-        while( 1 )
-        {
-            FD_ZERO( &fdread );
-            FD_SET( sd->sock, &fdread );
-            if( (rc = select( sd->sock + 1, NULL, &fdread, NULL, &timeout ))
-                    <= 0 )
-            {
-                sd->error = EPIPE;
-                break;
-            }
-            if( connect( sd->sock, (struct sockaddr *)&sa, sizeof(sa) ) >= 0 )
-            {
-                return 1;
-            }
-        }
-#if defined(_MSC_VER)
-        closesocket( sd->sock );
-#else
-        close( sd->sock );
-#endif
-        sd->sock = -1;
+        sd->error = WSAGetLastError();
+        return 0;
     }
-    sd->error = errno == EINPROGRESS ? ETIME : errno;
-    return 0;
+
+    if( ioctlsocket( sd->sock, FIONBIO, &nonblock ) == SOCKET_ERROR )
+    {
+        sd->error = WSAGetLastError();
+        closesocket( sd->sock );
+        return 0;
+    }
+
+    if( connect( sd->sock, (struct sockaddr*)&sa, sizeof(sa) ) == SOCKET_ERROR )
+    {
+        if( WSAGetLastError() != WSAEWOULDBLOCK )
+        {
+            sd->error = WSAGetLastError();
+            closesocket( sd->sock );
+            return 0;
+        }
+    }
+    /*
+     while( 1 )
+     {
+     FD_ZERO( &fdwrite );
+     FD_ZERO( &fdexcept );
+
+     FD_SET( sd->sock, &fdwrite );
+     FD_SET( sd->sock, &fdexcept );
+
+     if( (rc = select( sd->sock + 1, NULL, &fdwrite, &fdexcept, &timeout ))
+     == SOCKET_ERROR )
+     {
+     sd->error = WSAGetLastError();
+     closesocket( sd->sock );
+     return 0;
+     }
+     if( !rc )
+     {
+     sd->error = ETIME;
+     closesocket( sd->sock );
+     return 0;
+     }
+     if( rc && FD_ISSET( sd->sock, &fdwrite ) ) break;
+     if( rc && FD_ISSET( sd->sock, &fdexcept ) )
+     {
+     sd->error = SOCKET_ERROR;
+     closesocket( sd->sock );
+     return 0;
+     }
+     }
+     FD_CLR( sd->sock, &fdwrite );
+     FD_CLR( sd->sock, &fdexcept );
+     */
+
+    return 1;
 }
 
 int knet_init_tls( ksocket sd )
@@ -234,11 +269,7 @@ void knet_disconnect( ksocket sd )
 {
     if( sd->sock >= 0 )
     {
-#if defined(_MSC_VER)
         closesocket( sd->sock );
-#else
-        close( sd->sock );
-#endif
     }
     if( sd->ssl )
     {
@@ -257,41 +288,34 @@ static int _knet_write_socket( ksocket sd, const char * buf, size_t sz )
     int rc;
     size_t left = sz;
     fd_set fdwrite;
-    struct timeval timeout;
-    /*time_t to = sd->timeout + time( NULL );*/
+    struct timeval time;
 
-    timeout.tv_sec = sd->timeout;
-    timeout.tv_usec = 0;
+    time.tv_sec = sd->timeout;
+    time.tv_usec = 0;
 
     while( left )
     {
-        /*
-         if( time( NULL ) > to )
-         {
-         sd->error = EPIPE;
-         return -1;
-         }
-         */
         FD_ZERO( &fdwrite );
         FD_SET( sd->sock, &fdwrite );
 
-        if( (rc = select( sd->sock + 1, NULL, &fdwrite, NULL, &timeout ))
-                == -1 )
+        if( (rc = select( sd->sock + 1, NULL, &fdwrite, NULL, &time ))
+                == SOCKET_ERROR )
         {
-            sd->error = errno == EINPROGRESS ? ETIME : errno;
+            sd->error = WSAGetLastError();
             return -1;
         }
-        if( rc == 0 )
+        if( !rc )
         {
-            continue;
+            sd->error = ETIME;
+            return -1;
         }
 
-        if( FD_ISSET( sd->sock, &fdwrite ) )
+        if( rc && FD_ISSET( sd->sock, &fdwrite ) )
         {
             rc = send( sd->sock, buf, left, 0 );
-            if( rc == -1 || rc == 0 )
+            if( rc == SOCKET_ERROR || rc == 0 )
             {
-                sd->error = errno == EINPROGRESS ? ETIME : errno;
+                sd->error = WSAGetLastError();
                 return -1;
             }
             left -= rc;
@@ -310,7 +334,6 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
     struct timeval timeout;
     int write_blocked_on_read = 0;
     int ssl_err = 0;
-    /*time_t to = time( NULL ) + sd->timeout;*/
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
@@ -318,14 +341,6 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
     sd->ssl_error = SSL_ERROR_NONE;
     while( left )
     {
-        /*
-         if( time( NULL ) > to )
-         {
-         sd->error = ETIME;
-         return -1;
-         }
-         */
-
         FD_ZERO( &fdwrite );
         FD_ZERO( &fdread );
         FD_SET( sd->sock, &fdwrite );
@@ -336,9 +351,9 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
         }
 
         if( (rc = select( sd->sock + 1, &fdread, &fdwrite, NULL, &timeout ))
-                < 0 )
+                == SOCKET_ERROR  )
         {
-            sd->error = errno == EINPROGRESS ? ETIME : errno;
+            sd->error = WSAGetLastError();
             return -1;
         }
 
@@ -369,7 +384,7 @@ static int _knet_write_ssl( ksocket sd, const char * buf, size_t sz )
                     break;
 
                 default:
-                    sd->error = errno == EINPROGRESS ? ETIME : errno;
+                    sd->error = WSAGetLastError();
                     sd->ssl_error = ssl_err;
                     return -1;
             }
@@ -394,7 +409,6 @@ static int _knet_read_ssl( ksocket sd )
     struct timeval timeout;
     int read_blocked_on_write = 0;
     int bFinish = 0;
-    /*time_t to = time( NULL ) + sd->timeout;*/
 
     timeout.tv_sec = sd->timeout;
     timeout.tv_usec = 0;
@@ -402,13 +416,6 @@ static int _knet_read_ssl( ksocket sd )
 
     while( !bFinish )
     {
-        /*
-         if( time( NULL ) > to )
-         {
-         sd->error = ETIME;
-         return -1;
-         }
-         */
         FD_ZERO( &fdread );
         FD_ZERO( &fdwrite );
         FD_SET( sd->sock, &fdread );
@@ -419,9 +426,9 @@ static int _knet_read_ssl( ksocket sd )
         }
 
         if( (rc = select( sd->sock + 1, &fdread, &fdwrite, NULL, &timeout ))
-                < 0 )
+                == SOCKET_ERROR )
         {
-            sd->error = errno == EINPROGRESS ? ETIME : errno;
+            sd->error = WSAGetLastError();
             return -1;
         }
         if( rc == 0 ) break;
@@ -431,13 +438,6 @@ static int _knet_read_ssl( ksocket sd )
         {
             while( 1 )
             {
-                /*
-                 if( time( NULL ) > to )
-                 {
-                 sd->error = EPIPE;
-                 return -1;
-                 }
-                 */
                 read_blocked_on_write = 0;
 
                 rc = SSL_read( sd->ssl, sd->buf + readed,
@@ -469,7 +469,7 @@ static int _knet_read_ssl( ksocket sd )
                 }
                 else
                 {
-                    sd->error = errno == EINPROGRESS ? ETIME : errno;
+                    sd->error = WSAGetLastError();
                     sd->ssl_error = ssl_err;
                     return -1;
                 }
@@ -481,32 +481,36 @@ static int _knet_read_ssl( ksocket sd )
 
 static int _knet_read_socket( ksocket sd )
 {
-    int rc = -1;
+    int rc = 0;
     fd_set fdread;
-    struct timeval timeout;
+    struct timeval time;
 
-    timeout.tv_sec = sd->timeout;
-    timeout.tv_usec = 0;
+    time.tv_sec = sd->timeout;
+    time.tv_usec = 0;
 
     FD_ZERO( &fdread );
     FD_SET( sd->sock, &fdread );
 
-    if( (rc = select( sd->sock + 1, &fdread, NULL, NULL, &timeout )) < 0 )
+    if( (rc = select( sd->sock + 1, &fdread, NULL, NULL, &time ))
+            == SOCKET_ERROR )
     {
-        sd->error = errno == EINPROGRESS ? ETIME : errno;
-        return -1;
+        sd->error = WSAGetLastError();
+        return 0;
+    }
+
+    if( !rc )
+    {
+        sd->error = ETIME;
+        return 0;
     }
 
     if( FD_ISSET( sd->sock, &fdread ) )
     {
         rc = recv( sd->sock, sd->buf, SOCK_BUF_LEN, 0 );
-        if( rc < 0 )
+        if( rc == SOCKET_ERROR )
         {
-            if( rc != EAGAIN )
-            {
-                sd->error = errno == EINPROGRESS ? ETIME : errno;
-                return -1;
-            }
+            sd->error = WSAGetLastError();
+            return 0;
         }
     }
 
@@ -528,16 +532,10 @@ static int _knet_getbuf( ksocket sd )
     }
     else if( rc == -1 )
     {
-        sd->error = errno;
+//        sd->error = errno;
         return -1;
     }
     sd->inbuf = rc;
-    /*
-     if( rc < SOCK_BUF_LEN )
-     {
-     sd->eof = 1;
-     }
-     */
     return rc;
 }
 
