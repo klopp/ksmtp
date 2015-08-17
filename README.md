@@ -1,7 +1,7 @@
 # ksmtp
 Small SMTP library
 
-```c
+```perl
 Smtp smtp = smtpCreate( KSMTP_USE_TLS );
 ```
 
