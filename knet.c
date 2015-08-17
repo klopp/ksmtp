@@ -14,27 +14,40 @@ static const char * _knet_ssl_error(int err)
 	switch (err)
 	{
 	case SSL_ERROR_NONE:
-		return "SSL_ERROR_NONE";
+		return "No SSL errors.";
+
 	case SSL_ERROR_WANT_READ:
-		return "SSL_ERROR_WANT_READ";
 	case SSL_ERROR_WANT_WRITE:
-		return "SSL_ERROR_WANT_WRITE";
+		return "The operation did not complete; "
+		        "the same TLS/SSL I/O function should be called again later.";
+
 	case SSL_ERROR_ZERO_RETURN:
-		return "SSL_ERROR_ZERO_RETURN";
+		return "The TLS/SSL connection has been closed.";
+
 	case SSL_ERROR_WANT_CONNECT:
-		return "SSL_ERROR_WANT_CONNECT";
 	case SSL_ERROR_WANT_ACCEPT:
-		return "SSL_ERROR_WANT_ACCEPT";
+		return "The underlying BIO was not connected yet to the peer and "
+		        "the call would block in connect()/accept(). The SSL function "
+		        "should be called again when the connection is established.";
+
 	case SSL_ERROR_WANT_X509_LOOKUP:
-		return "SSL_ERROR_WANT_X509_LOOKUP";
+		return "The operation did not complete because an application callback "
+		        "set by SSL_CTX_set_client_cert_cb() has asked to be called "
+		        "again.  The TLS/SSL I/O function should be called again later.";
+
 	case SSL_ERROR_SYSCALL:
-		return "SSL_ERROR_SYSCALL";
+		return "Some I/O error occurred.  The OpenSSL error queue may contain "
+		        "more information on the error.";
+
 	case SSL_ERROR_SSL:
-		return "SSL_ERROR_SSL";
+		return "A failure in the SSL library occurred, usually a protocol "
+		        "error. The OpenSSL error queue contains more information "
+		        "on the error.";
+
 	default:
 		break;
 	}
-	sprintf(_ssl_err_buf, "SSL_ERROR_UNKNOWN (%d)", err);
+	sprintf(_ssl_err_buf, "Unknown SSL error (%d)", err);
 	return _ssl_err_buf;
 }
 
@@ -369,7 +382,6 @@ static int _knet_write_ssl(ksocket sd, const char * buf, size_t sz)
 			sd->error = WSAGetLastError();
 			return -1;
 		}
-
 		if (rc == 0)
 		{
 			continue;
@@ -510,7 +522,6 @@ static int _knet_read_socket(ksocket sd)
 		sd->error = WSAGetLastError();
 		return 0;
 	}
-
 	if (!rc)
 	{
 		sd->error = WSAETIMEDOUT;
