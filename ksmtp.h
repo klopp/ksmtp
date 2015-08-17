@@ -5,6 +5,10 @@
  *      Author: Vsevolod Lutovinov <klopp@yandex.ru>
  */
 
+/*
+ * Moved to Github 17.08.2015
+ */
+
 #ifndef KSMTP_H_
 #define KSMTP_H_
 
