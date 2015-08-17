@@ -213,6 +213,14 @@ int knet_connect( ksocket sd, const char * host, int port )
     return 1;
 }
 
+static int _knet_verify_sert( ksocket sd )
+{
+    X509 *cert = SSL_get_peer_certificate( sd->ssl );
+    if( !cert ) return 0;
+    X509_free( cert );
+    return 1;
+}
+
 int knet_init_tls( ksocket sd )
 {
     struct timeval timeout;
@@ -267,7 +275,7 @@ int knet_init_tls( ksocket sd )
         switch( (rc = SSL_get_error( sd->ssl, rc )) )
         {
             case SSL_ERROR_NONE:
-                return 1;
+                return _knet_verify_sert( sd );
 
             case SSL_ERROR_WANT_READ:
                 break;
@@ -285,14 +293,6 @@ int knet_init_tls( ksocket sd )
         }
     }
     return 0;
-}
-
-int knet_verify_sert( ksocket sd )
-{
-    X509 *cert = SSL_get_peer_certificate( sd->ssl );
-    if( !cert ) return 0;
-    X509_free( cert );
-    return 1;
 }
 
 void knet_disconnect( ksocket sd )

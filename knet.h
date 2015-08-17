@@ -58,7 +58,6 @@ void knet_disconnect(ksocket sd);
 int knet_read(ksocket sd, char *buf, size_t size);
 int knet_write(ksocket sd, const char *buf, size_t size);
 int knet_getc(ksocket sd);
-int knet_verify_sert(ksocket sd);
 int knet_init_tls(ksocket sd);
 const char * knet_error(ksocket sd);
 
