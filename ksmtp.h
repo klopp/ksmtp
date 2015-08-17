@@ -11,7 +11,7 @@
 #include "../klib/list.h"
 #include "../stringlib/stringlib.h"
 
-#include "../klib/knet.h"
+#include "../knet/ksocket.h"
 
 #include <limits.h>
 
