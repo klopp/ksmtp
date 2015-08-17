@@ -211,7 +211,7 @@ static int makeOneAddr( Smtp smtp, const char * title, Addr a, string out )
     {
         string buf = makeEmail( smtp, a );
         if( !buf ) return 0;
-        if( !xscatc( out, title, ": ", buf, "\r\n", NULL ) )
+        if( !xscatc( out, title, ": ", sstr(buf), "\r\n", NULL ) )
         {
             sdel( buf );
             return 0;
