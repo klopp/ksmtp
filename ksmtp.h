@@ -20,6 +20,7 @@ typedef enum _AuthType
     AUTH_LOGIN = 1, AUTH_PLAIN = 2
 } AuthType;
 
+#define KSMTP_DEFAULT_TIMEOUT   10
 #define KSMTP_DEFAULT_CHARSET   "UTF-8"
 #define KFILE_CONTENT_ID        "file@"
 
