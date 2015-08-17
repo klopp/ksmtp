@@ -1,9 +1,9 @@
 /*
- * knet.h, part of "ksmtp" project.
- *
- *  Created on: 20.05.2015, 02:41
- *      Author: Vsevolod Lutovinov <klopp@yandex.ru>
- */
+* knet.h, part of "ksmtp" project.
+*
+*  Created on: 20.05.2015, 02:41
+*      Author: Vsevolod Lutovinov <klopp@yandex.ru>
+*/
 
 #ifndef KNET_H_
 #define KNET_H_
@@ -40,32 +40,33 @@
 
 typedef struct _ksocket
 {
-    int timeout;
-    int eof;
-    int sock;
-    int error;
-    int ssl_error;
-    int inbuf;
-    int cursor;
-    char buf[SOCK_BUF_LEN];
-    SSL_CTX *ctx;
-    SSL *ssl;
+	int timeout;
+	int eof;
+	int sock;
+	int error;
+	int ssl_error;
+	int inbuf;
+	int cursor;
+	char buf[SOCK_BUF_LEN];
+	SSL_CTX *ctx;
+	SSL *ssl;
 }*ksocket;
 
-int knet_connect( ksocket sd, const char * host, int port );
-void knet_disconnect( ksocket sd );
+int knet_connect(ksocket sd, const char * host, int port);
+void knet_disconnect(ksocket sd);
 
-int knet_read( ksocket sd, char *buf, size_t size );
-int knet_write( ksocket sd, const char *buf, size_t size );
-int knet_getc( ksocket sd );
-int knet_verify_sert( ksocket sd );
-int knet_init_tls( ksocket sd );
-const char * knet_error( ksocket sd );
+int knet_read(ksocket sd, char *buf, size_t size);
+int knet_write(ksocket sd, const char *buf, size_t size);
+int knet_getc(ksocket sd);
+int knet_verify_sert(ksocket sd);
+int knet_init_tls(ksocket sd);
+const char * knet_error(ksocket sd);
 
 #ifndef __WINDOWS__
 # define    closesocket         close
 # define    WSAGetLastError()   errno
 # define    WSAEWOULDBLOCK      EINPROGRESS
+# define	WSAETIMEDOUT		ETIME
 # define    ioctlsocket         ioctl
 # define    SOCKET_ERROR        -1
 #endif
