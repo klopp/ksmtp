@@ -58,7 +58,7 @@ Smtp smtpCreate( KsmtpFlags flags )
     smtp->flags = flags;
     smtp->port = 25;
 
-    knet_create_sd( &smtp->sd, KSMTP_DEFAULT_TIMEOUT );
+    knet_create_sd( &smtp->sd, 0 );
 
     if( gethostname( smtp->nodename, sizeof(smtp->nodename) - 1 ) < 0 )
     {
