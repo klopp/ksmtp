@@ -1,469 +1,482 @@
 /*
- * ksmtp.c, part of "ksmtp" project.
+ * kmail.c, part of "ksmtp" project.
  *
- *  Created on: 20.05.2015, 00:49
+ *  Created on: 18.08.2015, 23:38
  *      Author: Vsevolod Lutovinov <klopp@yandex.ru>
  */
 
-#include "ksmtp.h"
-#include "addr.h"
+#include "kmail.h"
 #include "mime.h"
-#include <limits.h>
 
-static void delTextPart( void * ptr )
+KMail mail_Create( KmailFlags flags, const char * node, int timeout )
 {
-    TextPart part = (TextPart)ptr;
-    Free( part->body );
-    Free( part->ctype );
-    Free( part );
-}
+    KMail mail = (KMail)Calloc( sizeof(struct _KMail), 1 );
+    if( !mail ) return NULL;
 
-static void delAddr( void * ptr )
-{
-    Addr addr = (Addr)ptr;
-    Free( addr->name );
-    Free( addr->email );
-    Free( addr );
-}
+    mail->smtp = smtp_Create( timeout, node, flags & KMAIL_VERBOSE_SMTP );
 
-static void delHeader( void * ptr )
-{
-    Header header = (Header)ptr;
-    Free( header->title );
-    Free( header->value );
-    Free( header );
-}
+    mail->flags = flags;
 
-static void delAFile( void *ptr )
-{
-    AFile file = (AFile)ptr;
-    Free( file->name );
-    Free( file->ctype );
-    Free( file );
-}
+    mail->error = snew();
+    mail->login = snew();
+    mail->password = snew();
+    mail->host = snew();
+    mail->port = 25;
 
-static void delEFile( void *ptr )
-{
-    EFile file = (EFile)ptr;
-    Free( file->name );
-    Free( file->ctype );
-    Free( file );
-}
-
-Smtp smtpCreate( KsmtpFlags flags )
-{
-    Smtp smtp = (Smtp)Calloc( sizeof(struct _Smtp), 1 );
-    if( !smtp ) return NULL;
-
-    smtp->flags = flags;
-    smtp->port = 25;
-
-    knet_create_sd( &smtp->sd, 0 );
-
-    if( gethostname( smtp->nodename, sizeof(smtp->nodename) - 1 ) < 0 )
+    if( !mail->error || !mail->login || !mail->password || !mail->port )
     {
-        strncpy( smtp->nodename, "localhost", sizeof(smtp->nodename) - 1 );
+        mail_Destroy( mail );
+        mail = NULL;
     }
-    smtp->parts = lcreate( delTextPart );
-    smtp->afiles = lcreate( delAFile );
-    smtp->efiles = lcreate( delEFile );
-    smtp->bcc = lcreate( delAddr );
-    smtp->cc = lcreate( delAddr );
-    smtp->to = lcreate( delAddr );
-    smtp->headers = lcreate( delHeader );
-
-    smtp->replyto = Calloc( sizeof(struct _Addr), 1 );
-    smtp->from = Calloc( sizeof(struct _Addr), 1 );
-
-    smtp->error = snew();
-    smtp->current = snew();
-
-    if( smtp->from && smtp->replyto && smtp->headers && smtp->to && smtp->cc
-            && smtp->bcc && smtp->parts && smtp->afiles && smtp->efiles
-            && smtp->error && smtp->current )
-    {
-        smtpSetCharset( smtp, KSMTP_DEFAULT_CHARSET );
-        return smtp;
-    }
-
-    smtpDestroy( smtp, 0 );
-    return NULL;
+    return mail;
 }
 
-int smtpDestroy( Smtp smtp, int sig )
+void mail_Destroy( KMail mail )
 {
-    knet_disconnect( &smtp->sd );
-
-    ldestroy( smtp->parts );
-    ldestroy( smtp->afiles );
-    ldestroy( smtp->efiles );
-    ldestroy( smtp->headers );
-    ldestroy( smtp->to );
-    ldestroy( smtp->cc );
-    ldestroy( smtp->bcc );
-
-    delAddr( smtp->from );
-    delAddr( smtp->replyto );
-
-    sdel( smtp->error );
-    sdel( smtp->current );
-
-    Free( smtp->subject );
-    Free( smtp->xmailer );
-    Free( smtp->host );
-    Free( smtp->smtp_user );
-    Free( smtp->smtp_password );
-
-    Free( smtp );
-    return sig;
+    sdel( mail->error );
+    sdel( mail->login );
+    sdel( mail->password );
+    sdel( mail->host );
+    smtp_Destroy( mail->smtp );
+    Free( mail );
 }
 
-int smtpAddTextPart( Smtp smtp, const char * body, const char *ctype,
-        const char * charset )
+int mail_SetLogin( KMail mail, const char * login )
 {
-    TextPart part = (TextPart)lfirst( smtp->parts );
-    while( part )
-    {
-        if( !strcasecmp( part->ctype, ctype ) )
-        {
-            // TODO check if part with ctype (and/or charset?) exists?
-        }
-        part = (TextPart)lnext( smtp->parts );
-    }
-
-    part = Malloc( sizeof(struct _TextPart) );
-    if( !part ) return 0;
-    part->body = Strdup( body );
-    if( !part->body )
-    {
-        Free( part );
-        return 0;
-    }
-    part->ctype = Strdup( ctype );
-    if( !part->ctype )
-    {
-        delTextPart( part );
-        return 0;
-    }
-    strncpy( part->charset, charset ? charset : smtp->charset,
-            sizeof(part->charset) - 1 );
-    if( !isUsAsciiCs( part->charset ) ) snprintf( part->cprefix,
-            sizeof(part->cprefix) - 1, "=?%s?B?", part->charset );
-    else *part->cprefix = 0;
-    if( !ladd( smtp->parts, part ) )
-    {
-        delTextPart( part );
-        return 0;
-    }
-    return 1;
+    return scpyc( mail->login, login ) != NULL;
 }
 
-int smtpAddDefTextPart( Smtp smtp, const char * body, const char *ctype )
+int mail_SetPassword( KMail mail, const char * password )
 {
-    return smtpAddTextPart( smtp, body, ctype, NULL );
+    return scpyc( mail->password, password ) != NULL;
 }
 
-int smtpAddUtfTextPart( Smtp smtp, const char * body, const char *ctype )
+int mail_SetSMTP( KMail mail, const char * host, int port )
 {
-    static char utf8[] = "UTF-8";
-    return smtpAddTextPart( smtp, body, ctype, utf8 );
-}
-
-int smtpSetReplyTo( Smtp smtp, const char * rto )
-{
-    Addr addr = createAddr( rto );
-    if( addr )
+    if( mail_SetPort( mail, port ) )
     {
-        delAddr( smtp->replyto );
-        smtp->replyto = addr;
+        mail_SetHost( mail, host );
         return 1;
     }
     return 0;
 }
 
-int smtpSetFrom( Smtp smtp, const char * from )
+int mail_SetHost( KMail mail, const char * host )
 {
-    Addr addr = createAddr( from );
-    if( addr )
-    {
-        delAddr( smtp->from );
-        smtp->from = addr;
-        return 1;
-    }
-    return 0;
+    return scpyc( mail->host, host ) != NULL;
 }
 
-int smtpAddCc( Smtp smtp, const char * cc )
-{
-    Addr addr = createAddr( cc );
-    if( addr )
-    {
-        if( !ladd( smtp->cc, addr ) )
-        {
-            delAddr( addr );
-            return 0;
-        }
-    }
-    return 1;
-}
-void smtpClearCc( Smtp smtp )
-{
-    lclear( smtp->cc );
-}
-void smtpClearTo( Smtp smtp )
-{
-    lclear( smtp->to );
-}
-int smtpAddBcc( Smtp smtp, const char * bcc )
-{
-    Addr addr = createAddr( bcc );
-    if( addr )
-    {
-        if( !ladd( smtp->bcc, addr ) )
-        {
-            delAddr( addr );
-            return 0;
-        }
-    }
-    return 1;
-}
-void smtpClearBcc( Smtp smtp )
-{
-    lclear( smtp->bcc );
-}
-
-int smtpAddTo( Smtp smtp, const char * to )
-{
-    Addr addr = createAddr( to );
-    if( addr )
-    {
-        if( !ladd( smtp->to, addr ) )
-        {
-            Free( addr );
-            return 0;
-        }
-    }
-    return 1;
-}
-
-int smtpAddHeader( Smtp smtp, const char * key, const char * value )
-{
-    Header header = Calloc( sizeof(struct _Header), 1 );
-    if( !header ) return 0;
-    header->title = Strdup( key );
-    header->value = Strdup( value );
-    if( !header->value || !header->title )
-    {
-        delHeader( header );
-        return 0;
-    }
-    if( !ladd( smtp->headers, header ) )
-    {
-        delHeader( header );
-        return 0;
-    }
-    return 1;
-}
-
-int smtpAddXMailer( Smtp smtp, const char * xmailer )
-{
-    return smtpAddHeader( smtp, "X-Mailer", xmailer );
-}
-
-void smtpClearHeaders( Smtp smtp )
-{
-    lclear( smtp->headers );
-}
-
-const char * smtpEmbedFile( Smtp smtp, const char * name, const char * ctype )
-{
-    EFile file = Calloc( sizeof(struct _EFile), 1 );
-    if( !file ) return NULL;
-    file->name = Strdup( name );
-    if( !file->name )
-    {
-        Free( file );
-        return NULL;
-    }
-    if( ctype )
-    {
-        file->ctype = Strdup( ctype );
-        if( !file->ctype )
-        {
-            delEFile( file );
-            return NULL;
-        }
-    }
-    smtp->lastid++;
-    sprintf( file->cid, "%s%zu", KFILE_CONTENT_ID, smtp->lastid );
-    if( !ladd( smtp->efiles, file ) )
-    {
-        delEFile( file );
-        return NULL;
-    }
-    return file->cid;
-}
-
-int smtpAttachFile( Smtp smtp, const char * name, const char * ctype )
-{
-    AFile file = Calloc( sizeof(struct _AFile), 1 );
-    if( !file ) return 0;
-    file->name = Strdup( name );
-    if( !file->name )
-    {
-        Free( file );
-        return 0;
-    }
-    if( ctype )
-    {
-        file->ctype = Strdup( ctype );
-        if( !file->ctype )
-        {
-            delAFile( file );
-            return 0;
-        }
-    }
-    smtp->lastid++;
-    if( !ladd( smtp->afiles, file ) )
-    {
-        delAFile( file );
-        return 0;
-    }
-    return 1;
-}
-
-void smtpClearAFiles( Smtp smtp )
-{
-    lclear( smtp->afiles );
-}
-
-void smtpClearEFiles( Smtp smtp )
-{
-    lclear( smtp->efiles );
-}
-
-int smtpSetSubject( Smtp smtp, const char * subj )
-{
-    char * s = Strdup( subj );
-    if( s )
-    {
-        Free( smtp->subject );
-        smtp->subject = s;
-        return 0;
-    }
-    return 1;
-}
-
-void smtpSetNodename( Smtp smtp, const char * node )
-{
-    strncpy( smtp->nodename, node, sizeof(smtp->nodename) - 1 );
-}
-
-void smtpSetCharset( Smtp smtp, const char * charset )
-{
-    strncpy( smtp->charset, charset, sizeof(smtp->charset) - 1 );
-    if( !isUsAsciiCs( charset ) ) snprintf( smtp->cprefix,
-            sizeof(smtp->cprefix) - 1, "=?%s?B?", charset );
-    else *smtp->cprefix = 0;
-}
-
-int smtpSetXmailer( Smtp smtp, const char * xmailer )
-{
-    char * x = Strdup( xmailer );
-    if( x )
-    {
-        Free( smtp->xmailer );
-        smtp->xmailer = x;
-        return 1;
-    }
-    return 0;
-}
-
-int smtpSetLogin( Smtp smtp, const char * login )
-{
-    char * s = Strdup( login );
-    if( s )
-    {
-        Free( smtp->smtp_user );
-        smtp->smtp_user = s;
-        return 1;
-    }
-    return 0;
-}
-
-int smtpSetPassword( Smtp smtp, const char * password )
-{
-    char * s = Strdup( password );
-    if( s )
-    {
-        Free( smtp->smtp_password );
-        smtp->smtp_password = s;
-        return 1;
-    }
-    return 0;
-}
-
-int smtpSetSMTP( Smtp smtp, const char * host, int port )
-{
-    if( smtpSetPort( smtp, port ) )
-    {
-        smtpSetHost( smtp, host );
-        return 1;
-    }
-    return 0;
-}
-
-int smtpSetHost( Smtp smtp, const char * server )
-{
-    char * h = Strdup( server );
-    if( h )
-    {
-        Free( smtp->host );
-        smtp->host = h;
-        return 1;
-    }
-    return 0;
-}
-
-int smtpSetAuth( Smtp smtp, AuthType auth )
-{
-    if( auth == AUTH_LOGIN || auth == AUTH_PLAIN )
-    {
-        smtp->smtp_auth = auth;
-        return 1;
-    }
-    return 0;
-}
-
-int smtpSetPort( Smtp smtp, int port )
+int mail_SetPort( KMail mail, int port )
 {
     if( port > 0 && port < INT_MAX )
     {
-        smtp->port = port;
+        mail->port = port;
         return 1;
     }
     return 0;
 }
 
-int smtpSetTimeout( Smtp smtp, int timeout )
+static int mail_set_SMTP_error( KMail mail )
 {
-    if( timeout > 0 && timeout < INT_MAX )
-    {
-        smtp->sd.timeout = timeout;
-        return 1;
-    }
+    scpy( mail->error, mail->smtp->error );
     return 0;
 }
 
-int smtpSendOneMail( Smtp smtp )
+int mail_OpenSession( KMail mail, int tls, AuthType auth )
 {
-    if( smtpOpenSession( smtp ) )
+    if( !smtp_OpenSession( mail->smtp, sstr( mail->host ), mail->port, tls ) )
     {
-        if( smtpSendMail( smtp ) )
+        return mail_set_SMTP_error( mail );
+    }
+
+    if( auth == AUTH_PLAIN )
+    {
+        if( !smtp_AUTH_PLAIN( mail->smtp, sstr( mail->login ),
+                sstr( mail->password ) ) ) return mail_set_SMTP_error( mail );
+    }
+    else if( auth == AUTH_LOGIN )
+    {
+        if( !smtp_AUTH_LOGIN( mail->smtp, sstr( mail->login ),
+                sstr( mail->password ) ) ) return mail_set_SMTP_error( mail );
+    }
+    else
+    {
+        mail_FormatError( mail, "Unknown AUTH type: %d", auth );
+        return 0;
+    }
+
+    return 1;
+}
+
+void mail_CloseSession( KMail mail )
+{
+    smtp_CloseSession( mail->smtp );
+}
+
+static int delMFile( MFile file )
+{
+    sdel( file->body );
+    sdel( file->headers );
+    return 0;
+}
+
+static int mail_EmbedFiles( KMail mail, KMsg msg, const char * boundary )
+{
+    struct _MFile file =
+    { NULL, NULL };
+    EFile efile = lfirst( msg->efiles );
+    file.headers = snew();
+
+    while( efile )
+    {
+        if( !msg_CreateFile( msg, &file, mail->error, boundary, efile->name,
+                efile->ctype, "inline", efile->cid ) )
         {
-            smtpCloseSession( smtp );
-            return 1;
+            return delMFile( &file );
+        }
+        if( !smtp_write( mail->smtp, sstr( file.headers ))
+                || !smtp_write( mail->smtp, sstr( file.body ))
+                || !smtp_write( mail->smtp, "\r\n" ) )
+        {
+            mail_FormatError( mail, "mail_EmbedFiles(\"%s\"), internal error",
+                    efile->name );
+            return delMFile( &file );
+        }
+        efile = lnext( msg->efiles );
+    }
+    delMFile( &file );
+    return 1;
+}
+
+static int mail_AttachFiles( KMail mail, KMsg msg, const char * boundary )
+{
+    struct _MFile file =
+    { NULL, NULL };
+    AFile afile = lfirst( msg->afiles );
+    file.headers = snew();
+
+    while( afile )
+    {
+        if( !msg_CreateFile( msg, &file, mail->error, boundary, afile->name,
+                afile->ctype, "attachment", NULL ) )
+        {
+            return delMFile( &file );
+        }
+        if( !smtp_write( mail->smtp, sstr( file.headers ))
+                || !smtp_write( mail->smtp, sstr( file.body ))
+                || !smtp_write( mail->smtp, "\r\n") )
+        {
+            mail_FormatError( mail, "mail_AttachFiles(\"%s\"), internal error",
+                    afile->name );
+            return delMFile( &file );
+        }
+        afile = lnext( msg->afiles );
+    }
+    delMFile( &file );
+    return 1;
+}
+
+static int write_boundary_end( KSmtp smtp, const char * boundary )
+{
+    return smtp_write( smtp, "--" )
+            && smtp_write( smtp, boundary )
+            && smtp_write( smtp, "--\r\n" );
+}
+
+static int write_boundary( KSmtp smtp, const char * boundary )
+{
+    return smtp_write( smtp, "--" )
+            && smtp_write( smtp, boundary )
+            && smtp_write( smtp, "\r\n" );
+}
+
+int mail_SendMessage( KMail mail, KMsg msg )
+{
+    Addr addr;
+    int rc = 1;
+    string out = NULL;
+    string related = NULL;
+    string multipart = NULL;
+    char mp_boundary[36];
+    char r_boundary[36];
+
+    if( !smtp_MAIL_FROM( mail->smtp, msg->from->email ) )
+    {
+        rc = 0;
+        goto pmend;
+    }
+
+    addr = lfirst( msg->to );
+    while( addr )
+    {
+        if( !smtp_RCPT_TO( mail->smtp, addr->email ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+        addr = lnext( msg->to );
+    }
+    addr = lfirst( msg->cc );
+    while( addr )
+    {
+        if( !smtp_RCPT_TO( mail->smtp, addr->email ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+        addr = lnext( msg->cc );
+    }
+
+    addr = lfirst( msg->bcc );
+    while( addr )
+    {
+        if( !smtp_RCPT_TO( mail->smtp, addr->email ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+        addr = lnext( msg->bcc );
+    }
+
+    out = msg_CreateHeaders( msg );
+    if( !out )
+    {
+        rc = 0;
+        goto pmend;
+    }
+
+    if( !smtp_DATA( mail->smtp )
+            || !smtp_write( mail->smtp, sstr( out ) ) )
+    {
+        rc = 0;
+        goto pmend;
+    }
+
+    sdel( out );
+    out = msg_CreateBody( msg );
+    if( !out )
+    {
+        rc = 0;
+        goto pmend;
+    }
+
+    if( msg->efiles->size )
+    {
+        mimeMakeBoundary( r_boundary );
+        related = sfromchar( "Content-Type: multipart/related; boundary=\"" );
+        if( !related || !xscatc( related, r_boundary, "\"\r\n\r\n", NULL ) )
+        {
+            rc = 0;
+            goto pmend;
         }
     }
-    return 0;
+
+    if( msg->afiles->size )
+    {
+        mimeMakeBoundary( mp_boundary );
+        multipart = sfromchar( "Content-Type: multipart/mixed; boundary=\"" );
+        if( !multipart
+                || !xscatc( multipart, mp_boundary, "\"\r\n\r\n", NULL ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+        if( !smtp_write( mail->smtp, sstr( multipart ) ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+        if( slen(out) && !write_boundary( mail->smtp, mp_boundary ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+
+        if( related )
+        {
+            if( !smtp_write( mail->smtp, sstr( related ) )
+                    || !write_boundary( mail->smtp, r_boundary )
+                    || !smtp_write( mail->smtp, sstr( out ) )
+                    || !mail_EmbedFiles( mail, msg, r_boundary )
+                    || !write_boundary_end( mail->smtp, r_boundary ) )
+            {
+                rc = 0;
+                goto pmend;
+            }
+        }
+
+        if( !mail_AttachFiles( mail, msg, mp_boundary )
+                || !write_boundary_end( mail->smtp, mp_boundary ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+    }
+    else if( msg->efiles->size )
+    {
+        if( !smtp_write( mail->smtp, sstr( related ) )
+                || !write_boundary( mail->smtp, r_boundary )
+                || !smtp_write( mail->smtp, sstr( out ) )
+                || !mail_EmbedFiles( mail, msg, r_boundary )
+                || !write_boundary_end( mail->smtp, r_boundary ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+    }
+    else
+    {
+        if( slen( out ) && !smtp_write( mail->smtp, sstr( out ) ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+    }
+
+    pmend: sdel( out );
+    sdel( related );
+    sdel( multipart );
+    smtp_END_DATA( mail->smtp );
+    return rc;
+
+    /*
+     Addr addr;
+     char mp_boundary[36];
+     char r_boundary[36];
+     string textparts = NULL;
+     string related = NULL;
+     string multipart = NULL;
+     int rc = 1;
+
+     textparts = makeTextParts( smtp );
+     if( !textparts )
+     {
+     rc = 0;
+     goto pmend;
+     }
+
+     if( !smtp_mail_from( smtp, smtp->from->email ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+
+     addr = lfirst( smtp->to );
+     while( addr )
+     {
+     if( !smtp_rcpt_to( smtp, addr->email ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+     addr = lnext( smtp->to );
+     }
+     addr = lfirst( smtp->cc );
+     while( addr )
+     {
+     if( !smtp_rcpt_to( smtp, addr->email ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+     addr = lnext( smtp->cc );
+     }
+     addr = lfirst( smtp->bcc );
+     while( addr )
+     {
+     if( !smtp_rcpt_to( smtp, addr->email ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+     addr = lnext( smtp->bcc );
+     }
+
+     if( !smtp_data( smtp )
+     || !ksmtp_write( smtp, sstr( headers ), slen( headers ) ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+
+     if( smtp->efiles->size )
+     {
+     mimeMakeBoundary( r_boundary );
+     related = sfromchar( "Content-Type: multipart/related; boundary=\"" );
+     if( !related || !xscatc( related, r_boundary, "\"\r\n\r\n", NULL ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+     }
+
+     if( smtp->afiles->size )
+     {
+     mimeMakeBoundary( mp_boundary );
+     multipart = sfromchar( "Content-Type: multipart/mixed; boundary=\"" );
+     if( !multipart
+     || !xscatc( multipart, mp_boundary, "\"\r\n\r\n", NULL ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+     if( !ksmtp_write( smtp, sstr( multipart ), slen( multipart ) ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+     if( slen(textparts) && !write_boundary( smtp, mp_boundary ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+
+     if( related )
+     {
+     if( !ksmtp_write( smtp, sstr( related ), slen( related ) )
+     || !write_boundary( smtp, r_boundary )
+     || !ksmtp_write( smtp, sstr( textparts ),
+     slen( textparts ) )
+     || !embedFiles( smtp, r_boundary )
+     || !write_boundary_end( smtp, r_boundary ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+     }
+
+     if( !attachFiles( smtp, mp_boundary )
+     || !write_boundary_end( smtp, mp_boundary ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+     }
+     else if( smtp->efiles->size )
+     {
+     if( !ksmtp_write( smtp, sstr( related ), slen( related ) )
+     || !write_boundary( smtp, r_boundary )
+     || !ksmtp_write( smtp, sstr( textparts ), slen( textparts ) )
+     || !embedFiles( smtp, r_boundary )
+     || !write_boundary_end( smtp, r_boundary ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+     }
+     else
+     {
+     if( slen( textparts )
+     && !ksmtp_write( smtp, sstr( textparts ), slen( textparts ) ) )
+     {
+     rc = 0;
+     goto pmend;
+     }
+     }
+     pmend: sdel( textparts );
+     sdel( multipart );
+     sdel( related );
+     return rc ? smtp_end_data( smtp ) : 0;
+     */
 }
+
