@@ -8,7 +8,7 @@
 #ifndef ADDR_H_
 #define ADDR_H_
 
-#include "ksmtp.h"
+#include "kmsg.h"
 
 Addr createAddr( const char * src );
 
