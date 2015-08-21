@@ -9,7 +9,11 @@
 #define ADDR_H_
 
 #include "kmsg.h"
+#include "../klib/plist.h"
 
-Addr createAddr( const char * src );
+#define A_EMAIL( pair ) (pair)->second
+#define A_NAME( pair )  (pair)->first
+
+Pair createAddr( const char * src );
 
 #endif /* ADDR_H_ */

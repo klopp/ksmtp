@@ -8,12 +8,13 @@
 #ifndef KMSG_H_
 #define KMSG_H_
 
-#include "../klib/list.h"
+#include "../klib/plist.h"
 #include "../stringlib/stringlib.h"
 
 #define KMSG_DEFAULT_CHARSET    "UTF-8"
 #define KFILE_CONTENT_ID        "file@"
 
+/*
 typedef struct _Addr
 {
     char * name;
@@ -31,6 +32,13 @@ typedef struct _AFile
     char * name;
     char * ctype;
 }*AFile;
+*/
+
+#define F_NAME( pair )  (pair)->first
+#define F_CTYPE( pair ) (pair)->second
+
+#define H_NAME( pair )  (pair)->first
+#define H_VALUE( pair ) (pair)->second
 
 typedef struct _EFile
 {
@@ -61,15 +69,15 @@ typedef struct _KMsg
     char *xmailer;
 
     size_t lastid;
-    List afiles;
+    PList afiles;
     List efiles;
     List parts;
-    List headers;
-    List to;
-    List cc;
-    List bcc;
-    Addr from;
-    Addr replyto;
+    PList headers;
+    PList to;
+    PList cc;
+    PList bcc;
+    Pair from;
+    Pair replyto;
 
 }*KMsg;
 

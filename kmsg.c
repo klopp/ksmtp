@@ -19,30 +19,6 @@ static void delTextPart( void * ptr )
     Free( part );
 }
 
-static void delAddr( void * ptr )
-{
-    Addr addr = (Addr)ptr;
-    Free( addr->name );
-    Free( addr->email );
-    Free( addr );
-}
-
-static void delHeader( void * ptr )
-{
-    Header header = (Header)ptr;
-    Free( header->title );
-    Free( header->value );
-    Free( header );
-}
-
-static void delAFile( void *ptr )
-{
-    AFile file = (AFile)ptr;
-    Free( file->name );
-    Free( file->ctype );
-    Free( file );
-}
-
 static void delEFile( void *ptr )
 {
     EFile file = (EFile)ptr;
@@ -57,15 +33,15 @@ KMsg msg_Create( void )
     if( !msg ) return NULL;
 
     msg->parts = lcreate( delTextPart );
-    msg->afiles = lcreate( delAFile );
+    msg->afiles = plcreate();
     msg->efiles = lcreate( delEFile );
-    msg->bcc = lcreate( delAddr );
-    msg->cc = lcreate( delAddr );
-    msg->to = lcreate( delAddr );
-    msg->headers = lcreate( delHeader );
+    msg->bcc = plcreate();
+    msg->cc = plcreate();
+    msg->to = plcreate();
+    msg->headers = plcreate();
 
-    msg->replyto = Calloc( sizeof(struct _Addr), 1 );
-    msg->from = Calloc( sizeof(struct _Addr), 1 );
+    msg->replyto = Calloc( sizeof(struct _Pair), 1 );
+    msg->from = Calloc( sizeof(struct _Pair), 1 );
 
     if( msg->from && msg->replyto && msg->headers && msg->to && msg->cc
             && msg->bcc && msg->parts && msg->afiles && msg->efiles )
@@ -88,8 +64,8 @@ void msg_Destroy( KMsg msg )
     ldestroy( msg->cc );
     ldestroy( msg->bcc );
 
-    delAddr( msg->from );
-    delAddr( msg->replyto );
+    pair_Delete( msg->from );
+    pair_Delete( msg->replyto );
 
     Free( msg->subject );
     Free( msg->xmailer );
@@ -150,10 +126,10 @@ int msg_AddUtfTextPart( KMsg msg, const char * body, const char *ctype )
 
 int msg_SetReplyTo( KMsg msg, const char * rto )
 {
-    Addr addr = createAddr( rto );
+    Pair addr = createAddr( rto );
     if( addr )
     {
-        delAddr( msg->replyto );
+        pair_Delete( msg->replyto );
         msg->replyto = addr;
         return 1;
     }
@@ -162,10 +138,10 @@ int msg_SetReplyTo( KMsg msg, const char * rto )
 
 int msg_SetFrom( KMsg msg, const char * from )
 {
-    Addr addr = createAddr( from );
+    Pair addr = createAddr( from );
     if( addr )
     {
-        delAddr( msg->from );
+        pair_Delete( msg->from );
         msg->from = addr;
         return 1;
     }
@@ -174,12 +150,12 @@ int msg_SetFrom( KMsg msg, const char * from )
 
 int msg_AddCc( KMsg msg, const char * cc )
 {
-    Addr addr = createAddr( cc );
+    Pair addr = createAddr( cc );
     if( addr )
     {
         if( !ladd( msg->cc, addr ) )
         {
-            delAddr( addr );
+            pair_Delete( addr );
             return 0;
         }
     }
@@ -187,20 +163,20 @@ int msg_AddCc( KMsg msg, const char * cc )
 }
 void smtpClearCc( KMsg msg )
 {
-    lclear( msg->cc );
+    plclear( msg->cc );
 }
 void smtpClearTo( KMsg msg )
 {
-    lclear( msg->to );
+    plclear( msg->to );
 }
 int msg_AddBcc( KMsg msg, const char * bcc )
 {
-    Addr addr = createAddr( bcc );
+    Pair addr = createAddr( bcc );
     if( addr )
     {
         if( !ladd( msg->bcc, addr ) )
         {
-            delAddr( addr );
+            pair_Delete( addr );
             return 0;
         }
     }
@@ -213,7 +189,7 @@ void smtpClearBcc( KMsg msg )
 
 int msg_AddTo( KMsg msg, const char * to )
 {
-    Addr addr = createAddr( to );
+    Pair addr = createAddr( to );
     if( addr )
     {
         if( !ladd( msg->to, addr ) )
@@ -227,21 +203,7 @@ int msg_AddTo( KMsg msg, const char * to )
 
 int msg_AddHeader( KMsg msg, const char * key, const char * value )
 {
-    Header header = Calloc( sizeof(struct _Header), 1 );
-    if( !header ) return 0;
-    header->title = Strdup( key );
-    header->value = Strdup( value );
-    if( !header->value || !header->title )
-    {
-        delHeader( header );
-        return 0;
-    }
-    if( !ladd( msg->headers, header ) )
-    {
-        delHeader( header );
-        return 0;
-    }
-    return 1;
+    return pladd( msg->headers, key, value ) != NULL;
 }
 
 int msg_AddXMailer( KMsg msg, const char * xmailer )
@@ -285,30 +247,7 @@ const char * msg_EmbedFile( KMsg msg, const char * name, const char * ctype )
 
 int msg_AttachFile( KMsg msg, const char * name, const char * ctype )
 {
-    AFile file = Calloc( sizeof(struct _AFile), 1 );
-    if( !file ) return 0;
-    file->name = Strdup( name );
-    if( !file->name )
-    {
-        Free( file );
-        return 0;
-    }
-    if( ctype )
-    {
-        file->ctype = Strdup( ctype );
-        if( !file->ctype )
-        {
-            delAFile( file );
-            return 0;
-        }
-    }
-    msg->lastid++;
-    if( !ladd( msg->afiles, file ) )
-    {
-        delAFile( file );
-        return 0;
-    }
-    return 1;
+    return pladd( msg->afiles, name, ctype ) != NULL;
 }
 
 void smtpClearAFiles( KMsg msg )
@@ -421,16 +360,16 @@ static int makeEncodedHeader( KMsg msg, const char * title, const char * value,
     return scatc( headers, "\r\n" ) != NULL;
 }
 
-static string makeEmail( KMsg msg, Addr a )
+static string makeEmail( KMsg msg, Pair a )
 {
     string buf = snew();
     if( !buf ) return NULL;
 
-    if( a->name )
+    if( A_NAME(a) )
     {
-        if( isUsAscii( a->name ) )
+        if( isUsAscii( A_NAME(a) ) )
         {
-            if( !sprint( buf, "%s <%s>", a->name, a->email ) )
+            if( !sprint( buf, "%s <%s>", A_NAME(a), A_EMAIL(a) ) )
             {
                 sdel( buf );
                 return NULL;
@@ -438,13 +377,13 @@ static string makeEmail( KMsg msg, Addr a )
         }
         else
         {
-            string b64 = encodeb64( msg->cprefix, a->name );
+            string b64 = encodeb64( msg->cprefix, A_NAME(a) );
             if( !b64 )
             {
                 sdel( buf );
                 return NULL;
             }
-            if( !sprint( buf, "%s <%s>", sstr( b64 ), a->email ) )
+            if( !sprint( buf, "%s <%s>", sstr( b64 ), A_EMAIL(a) ) )
             {
                 sdel( buf );
                 sdel( b64 );
@@ -455,7 +394,7 @@ static string makeEmail( KMsg msg, Addr a )
     }
     else
     {
-        if( !scatc( buf, a->email ) )
+        if( !scatc( buf, A_EMAIL(a) ) )
         {
             sdel( buf );
             return 0;
@@ -464,9 +403,9 @@ static string makeEmail( KMsg msg, Addr a )
     return buf;
 }
 
-static int makeOneAddr( KMsg msg, const char * title, Addr a, string out )
+static int makeOneAddr( KMsg msg, const char * title, Pair a, string out )
 {
-    if( a && a->email )
+    if( a && A_EMAIL(a) )
     {
         string buf = makeEmail( msg, a );
         if( !buf ) return 0;
@@ -480,7 +419,7 @@ static int makeOneAddr( KMsg msg, const char * title, Addr a, string out )
     return 1;
 }
 
-static int makeAddr( KMsg msg, Addr a, string out )
+static int makeAddr( KMsg msg, Pair a, string out )
 {
     if( a )
     {
@@ -500,16 +439,16 @@ static int makeAddr( KMsg msg, Addr a, string out )
 
 static int makeAddrList( KMsg msg, const char * title, List list, string out )
 {
-    Addr a;
+    Pair a;
 
     if( !list || !list->size ) return 1;
     if( !xscatc( out, title, ": ", NULL ) ) return 0;
 
-    a = (Addr)lfirst( list );
+    a = lfirst( list );
     while( a )
     {
         if( !makeAddr( msg, a, out ) ) return 0;
-        a = (Addr)lnext( list );
+        a = lnext( list );
         if( !scatc( out, a ? "," : "\r\n" ) ) return 0;
     }
     return 1;
@@ -530,10 +469,10 @@ static int makeDateHeader( string out )
 
 static int makeExtraHeaders( KMsg msg, string out )
 {
-    Header header = lfirst( msg->headers );
+    Pair header = lfirst( msg->headers );
     while( header )
     {
-        if( !makeEncodedHeader( msg, header->title, header->value, out ) ) return 0;
+        if( !makeEncodedHeader( msg, H_NAME(header), H_VALUE(header), out ) ) return 0;
         header = lnext( msg->headers );
     }
     return 1;

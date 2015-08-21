@@ -58,10 +58,10 @@ static char * _stripEmail( char *str )
     return str;
 }
 
-Addr createAddr( const char * src )
+Pair createAddr( const char * src )
 {
     char * scopy;
-    Addr addr = Calloc( sizeof(struct _Addr), 1 );
+    Pair addr = pair_Create( NULL, NULL);
     if( !addr ) return NULL;
     scopy = Strdup( src );
     if( !scopy )
@@ -73,8 +73,8 @@ Addr createAddr( const char * src )
     if( strchr( scopy, '<' ) && *scopy != '<' )
     {
         char *tok = strtok( scopy, "<" );
-        addr->name = Strdup( tok );
-        if( !addr->name )
+        A_NAME(addr) = Strdup( tok );
+        if( !A_NAME(addr) )
         {
             Free( addr );
             Free( scopy );
@@ -84,18 +84,16 @@ Addr createAddr( const char * src )
         tok = strtok( tok, ">" );
         if( tok == NULL )
         {
-            Free( addr->name );
-            Free( addr );
+            pair_Delete( addr );
             Free( scopy );
             return NULL;
         }
         else
         {
-            addr->email = Strdup( tok );
-            if( !addr->email )
+            A_EMAIL(addr) = Strdup( tok );
+            if( !A_EMAIL(addr) )
             {
-                Free( addr->name );
-                Free( addr );
+                pair_Delete( addr );
                 Free( scopy );
                 return NULL;
             }
@@ -103,17 +101,17 @@ Addr createAddr( const char * src )
     }
     else
     {
-        addr->email = Strdup( scopy );
-        if( !addr->email )
+        A_EMAIL(addr) = Strdup( scopy );
+        if( !A_EMAIL(addr) )
         {
-            Free( addr );
+            pair_Delete( addr );
             Free( scopy );
             return NULL;
         }
     }
 
-    if( addr->name ) _stripName( addr->name );
-    if( addr->email ) _stripEmail( addr->email );
+    if( A_NAME(addr) ) _stripName( A_NAME(addr) );
+    if( A_EMAIL(addr) ) _stripEmail( A_EMAIL(addr) );
     Free( scopy );
     return addr;
 }

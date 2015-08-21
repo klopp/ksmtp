@@ -7,6 +7,7 @@
 
 #include "kmail.h"
 #include "mime.h"
+#include "addr.h"
 
 KMail mail_Create( KmailFlags flags, const char * node, int timeout )
 {
@@ -134,8 +135,8 @@ static int mail_EmbedFiles( KMail mail, KMsg msg, const char * boundary )
         {
             return delMFile( &file );
         }
-        if( !smtp_write( mail->smtp, sstr( file.headers ))
-                || !smtp_write( mail->smtp, sstr( file.body ))
+        if( !smtp_write( mail->smtp, sstr( file.headers ) )
+                || !smtp_write( mail->smtp, sstr( file.body ) )
                 || !smtp_write( mail->smtp, "\r\n" ) )
         {
             mail_FormatError( mail, "mail_EmbedFiles(\"%s\"), internal error",
@@ -152,22 +153,22 @@ static int mail_AttachFiles( KMail mail, KMsg msg, const char * boundary )
 {
     struct _MFile file =
     { NULL, NULL };
-    AFile afile = lfirst( msg->afiles );
+    Pair afile = lfirst( msg->afiles );
     file.headers = snew();
 
     while( afile )
     {
-        if( !msg_CreateFile( msg, &file, mail->error, boundary, afile->name,
-                afile->ctype, "attachment", NULL ) )
+        if( !msg_CreateFile( msg, &file, mail->error, boundary, F_NAME(afile),
+                F_CTYPE(afile), "attachment", NULL ) )
         {
             return delMFile( &file );
         }
-        if( !smtp_write( mail->smtp, sstr( file.headers ))
-                || !smtp_write( mail->smtp, sstr( file.body ))
-                || !smtp_write( mail->smtp, "\r\n") )
+        if( !smtp_write( mail->smtp, sstr( file.headers ) )
+                || !smtp_write( mail->smtp, sstr( file.body ) )
+                || !smtp_write( mail->smtp, "\r\n" ) )
         {
             mail_FormatError( mail, "mail_AttachFiles(\"%s\"), internal error",
-                    afile->name );
+                    F_NAME(afile) );
             return delMFile( &file );
         }
         afile = lnext( msg->afiles );
@@ -178,21 +179,19 @@ static int mail_AttachFiles( KMail mail, KMsg msg, const char * boundary )
 
 static int write_boundary_end( KSmtp smtp, const char * boundary )
 {
-    return smtp_write( smtp, "--" )
-            && smtp_write( smtp, boundary )
+    return smtp_write( smtp, "--" ) && smtp_write( smtp, boundary )
             && smtp_write( smtp, "--\r\n" );
 }
 
 static int write_boundary( KSmtp smtp, const char * boundary )
 {
-    return smtp_write( smtp, "--" )
-            && smtp_write( smtp, boundary )
+    return smtp_write( smtp, "--" ) && smtp_write( smtp, boundary )
             && smtp_write( smtp, "\r\n" );
 }
 
 int mail_SendMessage( KMail mail, KMsg msg )
 {
-    Addr addr;
+    Pair addr;
     int rc = 1;
     string out = NULL;
     string related = NULL;
@@ -200,7 +199,7 @@ int mail_SendMessage( KMail mail, KMsg msg )
     char mp_boundary[36];
     char r_boundary[36];
 
-    if( !smtp_MAIL_FROM( mail->smtp, msg->from->email ) )
+    if( !smtp_MAIL_FROM( mail->smtp, A_EMAIL(msg->from) ) )
     {
         rc = 0;
         goto pmend;
@@ -209,7 +208,7 @@ int mail_SendMessage( KMail mail, KMsg msg )
     addr = lfirst( msg->to );
     while( addr )
     {
-        if( !smtp_RCPT_TO( mail->smtp, addr->email ) )
+        if( !smtp_RCPT_TO( mail->smtp, A_EMAIL(addr) ) )
         {
             rc = 0;
             goto pmend;
@@ -219,7 +218,7 @@ int mail_SendMessage( KMail mail, KMsg msg )
     addr = lfirst( msg->cc );
     while( addr )
     {
-        if( !smtp_RCPT_TO( mail->smtp, addr->email ) )
+        if( !smtp_RCPT_TO( mail->smtp, A_EMAIL(addr) ) )
         {
             rc = 0;
             goto pmend;
@@ -230,7 +229,7 @@ int mail_SendMessage( KMail mail, KMsg msg )
     addr = lfirst( msg->bcc );
     while( addr )
     {
-        if( !smtp_RCPT_TO( mail->smtp, addr->email ) )
+        if( !smtp_RCPT_TO( mail->smtp, A_EMAIL(addr) ) )
         {
             rc = 0;
             goto pmend;
@@ -245,8 +244,12 @@ int mail_SendMessage( KMail mail, KMsg msg )
         goto pmend;
     }
 
-    if( !smtp_DATA( mail->smtp )
-            || !smtp_write( mail->smtp, sstr( out ) ) )
+    if( mail->flags & KMAIL_VERBOSE_MSG )
+    {
+        fprintf( stderr, "%s", sstr( out ) );
+    }
+
+    if( !smtp_DATA( mail->smtp ) || !smtp_write( mail->smtp, sstr( out ) ) )
     {
         rc = 0;
         goto pmend;
@@ -258,6 +261,11 @@ int mail_SendMessage( KMail mail, KMsg msg )
     {
         rc = 0;
         goto pmend;
+    }
+
+    if( mail->flags & KMAIL_VERBOSE_MSG )
+    {
+        fprintf( stderr, "%s", sstr( out ) );
     }
 
     if( msg->efiles->size )
@@ -338,145 +346,81 @@ int mail_SendMessage( KMail mail, KMsg msg )
     sdel( multipart );
     smtp_END_DATA( mail->smtp );
     return rc;
-
-    /*
-     Addr addr;
-     char mp_boundary[36];
-     char r_boundary[36];
-     string textparts = NULL;
-     string related = NULL;
-     string multipart = NULL;
-     int rc = 1;
-
-     textparts = makeTextParts( smtp );
-     if( !textparts )
-     {
-     rc = 0;
-     goto pmend;
-     }
-
-     if( !smtp_mail_from( smtp, smtp->from->email ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-
-     addr = lfirst( smtp->to );
-     while( addr )
-     {
-     if( !smtp_rcpt_to( smtp, addr->email ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-     addr = lnext( smtp->to );
-     }
-     addr = lfirst( smtp->cc );
-     while( addr )
-     {
-     if( !smtp_rcpt_to( smtp, addr->email ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-     addr = lnext( smtp->cc );
-     }
-     addr = lfirst( smtp->bcc );
-     while( addr )
-     {
-     if( !smtp_rcpt_to( smtp, addr->email ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-     addr = lnext( smtp->bcc );
-     }
-
-     if( !smtp_data( smtp )
-     || !ksmtp_write( smtp, sstr( headers ), slen( headers ) ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-
-     if( smtp->efiles->size )
-     {
-     mimeMakeBoundary( r_boundary );
-     related = sfromchar( "Content-Type: multipart/related; boundary=\"" );
-     if( !related || !xscatc( related, r_boundary, "\"\r\n\r\n", NULL ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-     }
-
-     if( smtp->afiles->size )
-     {
-     mimeMakeBoundary( mp_boundary );
-     multipart = sfromchar( "Content-Type: multipart/mixed; boundary=\"" );
-     if( !multipart
-     || !xscatc( multipart, mp_boundary, "\"\r\n\r\n", NULL ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-     if( !ksmtp_write( smtp, sstr( multipart ), slen( multipart ) ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-     if( slen(textparts) && !write_boundary( smtp, mp_boundary ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-
-     if( related )
-     {
-     if( !ksmtp_write( smtp, sstr( related ), slen( related ) )
-     || !write_boundary( smtp, r_boundary )
-     || !ksmtp_write( smtp, sstr( textparts ),
-     slen( textparts ) )
-     || !embedFiles( smtp, r_boundary )
-     || !write_boundary_end( smtp, r_boundary ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-     }
-
-     if( !attachFiles( smtp, mp_boundary )
-     || !write_boundary_end( smtp, mp_boundary ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-     }
-     else if( smtp->efiles->size )
-     {
-     if( !ksmtp_write( smtp, sstr( related ), slen( related ) )
-     || !write_boundary( smtp, r_boundary )
-     || !ksmtp_write( smtp, sstr( textparts ), slen( textparts ) )
-     || !embedFiles( smtp, r_boundary )
-     || !write_boundary_end( smtp, r_boundary ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-     }
-     else
-     {
-     if( slen( textparts )
-     && !ksmtp_write( smtp, sstr( textparts ), slen( textparts ) ) )
-     {
-     rc = 0;
-     goto pmend;
-     }
-     }
-     pmend: sdel( textparts );
-     sdel( multipart );
-     sdel( related );
-     return rc ? smtp_end_data( smtp ) : 0;
-     */
 }
 
+int mail_SendFromFile( KMail mail, const char * file, const char * from,
+        const List to, const List cc, const List bcc )
+{
+    char buf[1024];
+    size_t rc = 1;
+    size_t readed;
+    Pair addr;
+    FILE * msg = fopen( file, "rb" );
+    if( !msg )
+    {
+        mail_FormatError( mail, "mail_SendFromFile(\"%s\") - %s", file,
+                strerror(errno) );
+        return 0;
+    }
+
+    if( !smtp_MAIL_FROM( mail->smtp, from ) )
+    {
+        rc = 0;
+        goto pmend;
+    }
+
+    addr = to ? lfirst( to ) : NULL;
+    while( addr )
+    {
+        if( !smtp_RCPT_TO( mail->smtp, A_EMAIL(addr) ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+        addr = lnext( to );
+    }
+
+    addr = cc ? lfirst( cc ) : NULL;
+    while( addr )
+    {
+        if( !smtp_RCPT_TO( mail->smtp, A_EMAIL(addr) ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+        addr = lnext( cc );
+    }
+
+    addr = bcc ? lfirst( bcc ) : NULL;
+    while( addr )
+    {
+        if( !smtp_RCPT_TO( mail->smtp, A_EMAIL(addr) ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+        addr = lnext( bcc );
+    }
+
+    if( !smtp_DATA( mail->smtp ) )
+    {
+        rc = 0;
+        goto pmend;
+    }
+    while( (readed = fread( buf, 1, sizeof(buf), msg )) > 0 )
+    {
+        if( !smtp_write_buf( mail->smtp, buf, readed ) )
+        {
+            rc = 0;
+            goto pmend;
+        }
+        if( mail->flags & KMAIL_VERBOSE_MSG )
+        {
+            fwrite( buf, 1, readed, stderr );
+        }
+    }
+
+    pmend: smtp_END_DATA( mail->smtp );
+    fclose( msg );
+    return rc;
+}

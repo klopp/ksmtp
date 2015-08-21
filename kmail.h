@@ -18,9 +18,7 @@ typedef enum _AuthType
 
 typedef enum _KmailFlags
 {
-    KMAIL_VERBOSE_MSG = 0x01,
-    KMAIL_VERBOSE_SMTP = 0x02,
-    KMAIL_DEFAULT = 0x00
+    KMAIL_VERBOSE_MSG = 0x01, KMAIL_VERBOSE_SMTP = 0x02, KMAIL_DEFAULT = 0x00
 } KmailFlags;
 
 typedef struct _KMail
@@ -50,6 +48,8 @@ int mail_SetPassword( KMail mail, const char * password );
 
 int mail_OpenSession( KMail mail, int tls, AuthType auth );
 int mail_SendMessage( KMail mail, KMsg msg );
+int mail_SendFromFile( KMail mail, const char * file, const char * from,
+        const List to, const List cc, const List bcc );
 void mail_CloseSession( KMail mail );
 
 #endif /* KMAIL_H_ */
